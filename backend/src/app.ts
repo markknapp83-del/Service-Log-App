@@ -71,7 +71,7 @@ async function createApp() {
   // Rate limiting for authentication endpoints
   const authLimiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 5, // 5 login attempts per window
+    max: process.env.NODE_ENV === 'production' ? 5 : 50, // More lenient for development
     message: {
       success: false,
       error: {
