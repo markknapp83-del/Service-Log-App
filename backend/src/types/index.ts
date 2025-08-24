@@ -182,6 +182,7 @@ export interface ServiceLog {
   userId: UserId;
   clientId: ClientId;
   activityId: ActivityId;
+  serviceDate: string; // Phase 3.5: Added service date field
   patientCount: number;
   isDraft: boolean;
   submittedAt?: ISODateString;
@@ -189,14 +190,14 @@ export interface ServiceLog {
   updatedAt: ISODateString;
 }
 
-// Patient entry details
+// Patient entry details - Phase 3.5: Appointment-based structure
+export type AppointmentType = 'new' | 'followup' | 'dna';
+
 export interface PatientEntry {
   readonly id: PatientEntryId;
   serviceLogId: ServiceLogId;
-  newPatients: number;
-  followupPatients: number;
-  dnaCount: number; // Did Not Attend
-  outcomeId?: OutcomeId;
+  appointmentType: AppointmentType; // Phase 3.5: Single appointment per entry
+  outcomeId: OutcomeId; // Phase 3.5: Made required
   createdAt: ISODateString;
   updatedAt: ISODateString;
 }
@@ -239,6 +240,7 @@ export interface DatabaseServiceLog {
   user_id: string;
   client_id: number;
   activity_id: number;
+  service_date: string; // Phase 3.5: Added service date field
   patient_count: number;
   is_draft: number;
   submitted_at: string | null;
@@ -249,10 +251,8 @@ export interface DatabaseServiceLog {
 export interface DatabasePatientEntry {
   id: string;
   service_log_id: string;
-  new_patients: number;
-  followup_patients: number;
-  dna_count: number;
-  outcome_id: number | null;
+  appointment_type: string; // Phase 3.5: Appointment-based structure
+  outcome_id: number; // Phase 3.5: Made required
   created_at: string;
   updated_at: string;
 }

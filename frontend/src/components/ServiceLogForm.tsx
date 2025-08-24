@@ -1,11 +1,12 @@
 // Service Log Form component following documented React Hook Form + Zod patterns
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Trash2, Save, RotateCcw } from 'lucide-react';
 
 import { Button } from './Button';
 import { Input } from './Input';
+import { DatePicker } from './DatePicker';
 import { Card } from './Card';
 import { Select, SelectOption } from './Select';
 import { useToast } from '../hooks/useToast';
@@ -15,7 +16,8 @@ import {
   Client, 
   Activity, 
   Outcome, 
-  PatientEntry 
+  PatientEntry,
+  AppointmentType
 } from '../types';
 import { cn } from '../utils/cn';
 
@@ -35,7 +37,8 @@ export function ServiceLogForm({
   isLoading = false
 }: ServiceLogFormComponentProps) {
   const [isDraftSaving, setIsDraftSaving] = useState(false);
-  const { toast } = useToast();
+  const { showToast } = useToast();
+  const draftLoadedRef = useRef(false);
 
   const {
     register,
@@ -52,6 +55,7 @@ export function ServiceLogForm({
     defaultValues: {
       clientId: initialData?.clientId || '',
       activityId: initialData?.activityId || '',
+      serviceDate: initialData?.serviceDate || '',
       patientCount: initialData?.patientCount || 1,
       patientEntries: initialData?.patientEntries || [],
     },
@@ -87,6 +91,13 @@ export function ServiceLogForm({
       label: outcome.name,
     }));
 
+  // Appointment type options
+  const appointmentTypeOptions: SelectOption[] = [
+    { value: 'new', label: 'New Patient' },
+    { value: 'followup', label: 'Follow-up Patient' },
+    { value: 'dna', label: 'Did Not Attend (DNA)' },
+  ];
+
   // Generate patient rows based on patient count
   useEffect(() => {
     const currentEntries = watchPatientEntries || [];
@@ -95,15 +106,13 @@ export function ServiceLogForm({
     if (desiredCount > 0 && currentEntries.length !== desiredCount) {
       const newEntries: PatientEntry[] = Array.from({ length: desiredCount }, (_, index) => {
         return currentEntries[index] || {
-          newPatients: 0,
-          followupPatients: 0,
-          dnaCount: 0,
+          appointmentType: 'new' as AppointmentType,
           outcomeId: '',
         };
       });
       replace(newEntries);
     }
-  }, [watchPatientCount, replace, watchPatientEntries]);
+  }, [watchPatientCount, replace]);
 
   // Auto-save draft functionality following documented patterns
   useEffect(() => {
@@ -123,46 +132,45 @@ export function ServiceLogForm({
 
       return () => clearTimeout(saveTimer);
     }
+    return undefined;
   }, [watch, isDirty]);
 
   // Load draft on component mount
   useEffect(() => {
+    if (draftLoadedRef.current) return; // Prevent multiple loads
+    
     const loadDraft = () => {
       try {
         const draft = localStorage.getItem('serviceLogDraft');
         if (draft && !initialData) {
-          const draftData = JSON.parse(draft);
-          reset(draftData);
-          toast({
-            title: 'Draft loaded',
-            description: 'Your previous work has been restored.',
-            variant: 'info',
-          });
+          // Clear any old draft data that might be causing issues
+          localStorage.removeItem('serviceLogDraft');
+          console.log('Cleared old draft data to prevent infinite loading');
         }
       } catch (error) {
         console.error('Failed to load draft:', error);
         localStorage.removeItem('serviceLogDraft');
       }
+      draftLoadedRef.current = true;
     };
 
     loadDraft();
-  }, [reset, initialData, toast]);
+  }, [reset, initialData]); // Remove showToast dependency to prevent infinite loop
 
   const handleFormSubmit = async (data: ServiceLogFormData) => {
     try {
       await onSubmit(data);
       // Clear draft on successful submission
       localStorage.removeItem('serviceLogDraft');
-      toast({
-        title: 'Service log saved',
-        description: 'Your service entry has been successfully recorded.',
-        variant: 'success',
+      draftLoadedRef.current = false; // Allow draft loading again
+      showToast({
+        type: 'success',
+        message: 'Service log saved: Your service entry has been successfully recorded.',
       });
     } catch (error) {
-      toast({
-        title: 'Save failed',
-        description: error instanceof Error ? error.message : 'Please try again.',
-        variant: 'error',
+      showToast({
+        type: 'error',
+        message: `Save failed: ${error instanceof Error ? error.message : 'Please try again.'}`,
       });
     }
   };
@@ -171,14 +179,15 @@ export function ServiceLogForm({
     reset({
       clientId: '',
       activityId: '',
+      serviceDate: '',
       patientCount: 1,
       patientEntries: [],
     });
     localStorage.removeItem('serviceLogDraft');
-    toast({
-      title: 'Form cleared',
-      description: 'All fields have been reset.',
-      variant: 'info',
+    draftLoadedRef.current = false; // Allow draft loading again
+    showToast({
+      type: 'info',
+      message: 'Form cleared: All fields have been reset.',
     });
   };
 
@@ -187,10 +196,10 @@ export function ServiceLogForm({
     
     return watchPatientEntries.reduce(
       (totals, entry) => ({
-        total: totals.total + (entry.newPatients || 0) + (entry.followupPatients || 0),
-        new: totals.new + (entry.newPatients || 0),
-        followup: totals.followup + (entry.followupPatients || 0),
-        dna: totals.dna + (entry.dnaCount || 0),
+        total: totals.total + 1,
+        new: totals.new + (entry.appointmentType === 'new' ? 1 : 0),
+        followup: totals.followup + (entry.appointmentType === 'followup' ? 1 : 0),
+        dna: totals.dna + (entry.appointmentType === 'dna' ? 1 : 0),
       }),
       { total: 0, new: 0, followup: 0, dna: 0 }
     );
@@ -244,6 +253,16 @@ export function ServiceLogForm({
         </div>
 
         <div className="mt-6">
+          <DatePicker
+            label="Service Date"
+            {...register('serviceDate')}
+            error={errors.serviceDate?.message}
+            helperText="Date when the service was provided"
+            required
+          />
+        </div>
+
+        <div className="mt-6">
           <Input
             label="Number of Patient Entries"
             type="number"
@@ -263,7 +282,7 @@ export function ServiceLogForm({
           <div className="flex items-center justify-between mb-6">
             <h2 className="text-lg font-medium text-neutral-900">Patient Entries</h2>
             <div className="text-sm text-neutral-600">
-              Total patients: <span className="font-medium">{totals.total}</span>
+              Total entries: <span className="font-medium">{totals.total}</span>
               {totals.total !== watchPatientCount && (
                 <span className="ml-2 text-red-600">
                   (Expected: {watchPatientCount})
@@ -295,31 +314,21 @@ export function ServiceLogForm({
                   </h3>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <Input
-                    label="New Patients"
-                    type="number"
-                    min={0}
-                    {...register(`patientEntries.${index}.newPatients`, { valueAsNumber: true })}
-                    error={errors.patientEntries?.[index]?.newPatients?.message}
-                  />
-
-                  <Input
-                    label="Follow-up Patients"
-                    type="number"
-                    min={0}
-                    {...register(`patientEntries.${index}.followupPatients`, { valueAsNumber: true })}
-                    error={errors.patientEntries?.[index]?.followupPatients?.message}
-                  />
-
-                  <Input
-                    label="DNA Count"
-                    type="number"
-                    min={0}
-                    {...register(`patientEntries.${index}.dnaCount`, { valueAsNumber: true })}
-                    error={errors.patientEntries?.[index]?.dnaCount?.message}
-                    helperText="Did Not Attend"
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-neutral-700 mb-2">
+                      Appointment Type <span className="text-red-500">*</span>
+                    </label>
+                    <Select
+                      options={appointmentTypeOptions}
+                      value={watch(`patientEntries.${index}.appointmentType`)}
+                      onValueChange={(value) => 
+                        setValue(`patientEntries.${index}.appointmentType`, value as AppointmentType, { shouldValidate: true })
+                      }
+                      placeholder="Select appointment type"
+                      error={errors.patientEntries?.[index]?.appointmentType?.message}
+                    />
+                  </div>
 
                   <div>
                     <label className="block text-sm font-medium text-neutral-700 mb-2">
@@ -346,19 +355,19 @@ export function ServiceLogForm({
               <h3 className="text-sm font-medium text-blue-900 mb-2">Summary</h3>
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                 <div>
-                  <span className="text-blue-700">Total Patients:</span>
+                  <span className="text-blue-700">Total Entries:</span>
                   <span className="ml-2 font-medium text-blue-900">{totals.total}</span>
                 </div>
                 <div>
-                  <span className="text-blue-700">New:</span>
+                  <span className="text-blue-700">New Patients:</span>
                   <span className="ml-2 font-medium text-blue-900">{totals.new}</span>
                 </div>
                 <div>
-                  <span className="text-blue-700">Follow-up:</span>
+                  <span className="text-blue-700">Follow-ups:</span>
                   <span className="ml-2 font-medium text-blue-900">{totals.followup}</span>
                 </div>
                 <div>
-                  <span className="text-blue-700">DNA:</span>
+                  <span className="text-blue-700">Did Not Attend:</span>
                   <span className="ml-2 font-medium text-blue-900">{totals.dna}</span>
                 </div>
               </div>

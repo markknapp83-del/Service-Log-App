@@ -14,12 +14,15 @@ describe('Validation Tests', () => {
     const validFormData: ServiceLogFormData = {
       clientId: '550e8400-e29b-41d4-a716-446655440000', // Valid UUID
       activityId: '550e8400-e29b-41d4-a716-446655440001', // Valid UUID
-      patientCount: 5,
+      serviceDate: '2023-12-01',
+      patientCount: 2,
       patientEntries: [
         {
-          newPatients: 3,
-          followupPatients: 2,
-          dnaCount: 0,
+          appointmentType: 'new',
+          outcomeId: '550e8400-e29b-41d4-a716-446655440002', // Valid UUID
+        },
+        {
+          appointmentType: 'followup',
           outcomeId: '550e8400-e29b-41d4-a716-446655440002', // Valid UUID
         },
       ],
@@ -699,12 +702,15 @@ describe('Validation Tests', () => {
       const validData = {
         clientId: '550e8400-e29b-41d4-a716-446655440000',
         activityId: '550e8400-e29b-41d4-a716-446655440001',
-        patientCount: 5,
+        serviceDate: '2023-12-01',
+        patientCount: 2,
         patientEntries: [
           {
-            newPatients: 3,
-            followupPatients: 2,
-            dnaCount: 0,
+            appointmentType: 'new' as const,
+            outcomeId: '550e8400-e29b-41d4-a716-446655440002',
+          },
+          {
+            appointmentType: 'followup' as const,
             outcomeId: '550e8400-e29b-41d4-a716-446655440002',
           },
         ],

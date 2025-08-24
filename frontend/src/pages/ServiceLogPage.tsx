@@ -23,53 +23,39 @@ export function ServiceLogPage() {
   const [formOptions, setFormOptions] = useState<FormOptions | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const { toast } = useToast();
+  const [demoModeShown, setDemoModeShown] = useState(false);
+  const { showToast } = useToast();
 
-  // Load form options on component mount (demo data)
+  // Load form options from real API
   useEffect(() => {
+    // Clear localStorage to prevent infinite loops from old draft data
+    localStorage.removeItem('serviceLogDraft');
+    
     const loadFormOptions = async () => {
       try {
         setIsLoading(true);
         
-        // Demo data for showcase
-        const demoFormOptions: FormOptions = {
-          clients: [
-            { id: '1', name: 'Downtown Clinic', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-            { id: '2', name: 'Community Health Center', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-            { id: '3', name: 'Regional Hospital', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-            { id: '4', name: 'Primary Care Practice', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-          ],
-          activities: [
-            { id: '1', name: 'General Consultation', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-            { id: '2', name: 'Physiotherapy', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-            { id: '3', name: 'Mental Health Counseling', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-            { id: '4', name: 'Preventive Care', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-            { id: '5', name: 'Chronic Disease Management', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-          ],
-          outcomes: [
-            { id: '1', name: 'Treatment Completed', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-            { id: '2', name: 'Referred to Specialist', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-            { id: '3', name: 'Follow-up Required', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-            { id: '4', name: 'Emergency Care Needed', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-            { id: '5', name: 'Patient Education Provided', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-          ]
-        };
-
-        // Simulate network delay
-        await new Promise(resolve => setTimeout(resolve, 800));
+        // Use real API endpoint for form options
+        const response = await apiService.get('/service-logs/options');
         
-        setFormOptions(demoFormOptions);
-        toast({
-          title: 'Demo Mode',
-          description: 'Using demo data for showcase. Backend integration available.',
-          variant: 'info',
-        });
+        if (response.success) {
+          setFormOptions(response.data);
+          
+          if (!demoModeShown) {
+            showToast({
+              type: 'success',
+              message: 'Form options loaded: Ready to create service log entries.',
+            });
+            setDemoModeShown(true);
+          }
+        } else {
+          throw new Error(response.error?.message || 'Failed to load form options');
+        }
       } catch (error) {
         console.error('Failed to load form options:', error);
-        toast({
-          title: 'Demo setup error',
-          description: 'Unable to load demo data.',
-          variant: 'error',
+        showToast({
+          type: 'error',
+          message: `Failed to load form options: ${error instanceof Error ? error.message : 'Please refresh to try again.'}`,
         });
       } finally {
         setIsLoading(false);
@@ -77,44 +63,51 @@ export function ServiceLogPage() {
     };
 
     loadFormOptions();
-  }, [toast]);
+  }, []); // Remove showToast dependency to prevent infinite loop
 
   const handleSubmit = async (data: ServiceLogFormData) => {
     try {
       setIsSubmitting(true);
       
-      // Demo submission - simulate API call
-      console.log('=== SERVICE LOG SUBMISSION (DEMO) ===');
-      console.log('Form Data:', JSON.stringify(data, null, 2));
       
-      // Calculate totals for demo
-      const totals = data.patientEntries.reduce(
-        (acc, entry) => ({
-          totalPatients: acc.totalPatients + entry.newPatients + entry.followupPatients,
-          newPatients: acc.newPatients + entry.newPatients,
-          followupPatients: acc.followupPatients + entry.followupPatients,
-          dnaCount: acc.dnaCount + entry.dnaCount,
-        }),
-        { totalPatients: 0, newPatients: 0, followupPatients: 0, dnaCount: 0 }
-      );
-      
-      console.log('Calculated Totals:', totals);
-      
-      // Simulate network delay
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
-      toast({
-        title: 'Service log submitted (Demo)',
-        description: `Successfully recorded ${totals.totalPatients} patients (${totals.newPatients} new, ${totals.followupPatients} follow-up).`,
-        variant: 'success',
+      // Submit to real API
+      const response = await apiService.post('/service-logs', {
+        clientId: data.clientId,
+        activityId: data.activityId,
+        serviceDate: data.serviceDate,
+        patientCount: data.patientCount,
+        patientEntries: data.patientEntries,
+        isDraft: false
       });
       
-      // In real implementation, this would clear the form or redirect
+      if (response.success) {
+        // Calculate totals for display using new appointment type structure
+        const totals = data.patientEntries.reduce(
+          (acc, entry) => ({
+            totalEntries: acc.totalEntries + 1,
+            newPatients: acc.newPatients + (entry.appointmentType === 'new' ? 1 : 0),
+            followupPatients: acc.followupPatients + (entry.appointmentType === 'followup' ? 1 : 0),
+            dnaCount: acc.dnaCount + (entry.appointmentType === 'dna' ? 1 : 0),
+          }),
+          { totalEntries: 0, newPatients: 0, followupPatients: 0, dnaCount: 0 }
+        );
+        
+
+        showToast({
+          type: 'success',
+          message: `Service log saved successfully: Recorded ${totals.totalEntries} patient entries (${totals.newPatients} new, ${totals.followupPatients} follow-up, ${totals.dnaCount} DNA) on ${data.serviceDate}.`,
+        });
+        
+        // Clear the form after successful submission
+        // The form component will handle this via the success callback
+      } else {
+        throw new Error(response.error?.message || 'Failed to save service log');
+      }
     } catch (error) {
-      console.error('Demo submission error:', error);
+      console.error('Service log submission error:', error);
       
       // Re-throw to let the form handle the error display
-      throw new Error('Demo submission completed successfully. In production, this would save to the database.');
+      throw error;
     } finally {
       setIsSubmitting(false);
     }
@@ -123,23 +116,27 @@ export function ServiceLogPage() {
   const handleSaveDraft = async (data: ServiceLogFormData) => {
     try {
       const response = await apiService.post('/service-logs', {
-        ...data,
+        clientId: data.clientId,
+        activityId: data.activityId,
+        serviceDate: data.serviceDate,
+        patientCount: data.patientCount,
+        patientEntries: data.patientEntries,
         isDraft: true,
       });
 
       if (response.success) {
-        toast({
-          title: 'Draft saved',
-          description: 'Your service log has been saved as a draft.',
-          variant: 'info',
+        showToast({
+          type: 'info',
+          message: 'Draft saved: Your service log has been saved as a draft.',
         });
+      } else {
+        throw new Error(response.error?.message || 'Failed to save draft');
       }
     } catch (error) {
       console.error('Failed to save draft:', error);
-      toast({
-        title: 'Draft save failed',
-        description: 'Unable to save draft. Your work is still preserved locally.',
-        variant: 'warning',
+      showToast({
+        type: 'warning',
+        message: `Draft save failed: ${error instanceof Error ? error.message : 'Unable to save draft. Your work is still preserved locally.'}`,
       });
     }
   };
@@ -233,17 +230,17 @@ export function ServiceLogPage() {
           </h3>
           <div className="text-sm text-blue-800 space-y-2">
             <p>
-              <strong>Patient Count:</strong> Enter the total number of individual patient entries you need to record.
+              <strong>Patient Count:</strong> Enter the total number of individual patient appointment entries you need to record.
             </p>
             <p>
-              <strong>Patient Entries:</strong> For each entry, specify the number of new patients, follow-up patients, 
-              and those who did not attend (DNA). Select the appropriate outcome for each entry.
+              <strong>Patient Entries:</strong> Each entry represents a single patient appointment. Select the appointment type 
+              (New Patient, Follow-up Patient, or Did Not Attend) and choose the appropriate outcome.
             </p>
             <p>
               <strong>Auto-save:</strong> Your work is automatically saved locally every 2 seconds to prevent data loss.
             </p>
             <p>
-              <strong>Validation:</strong> The total patients across all entries must match your specified patient count.
+              <strong>Validation:</strong> The number of patient entries must match your specified patient count.
             </p>
           </div>
         </Card>

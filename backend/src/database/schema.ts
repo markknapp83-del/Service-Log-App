@@ -62,6 +62,7 @@ export function createTables(): void {
       user_id TEXT NOT NULL,
       client_id INTEGER NOT NULL,
       activity_id INTEGER NOT NULL,
+      service_date TEXT NOT NULL,
       patient_count INTEGER NOT NULL DEFAULT 0,
       is_draft INTEGER DEFAULT 0,
       submitted_at TEXT,
@@ -73,15 +74,13 @@ export function createTables(): void {
     )
   `);
 
-  // Patient Entries table - detailed patient service data
+  // Patient Entries table - appointment-based structure (Phase 3.5)
   db.exec(`
     CREATE TABLE IF NOT EXISTS patient_entries (
       id TEXT PRIMARY KEY,
       service_log_id TEXT NOT NULL,
-      new_patients INTEGER DEFAULT 0,
-      followup_patients INTEGER DEFAULT 0,
-      dna_count INTEGER DEFAULT 0,
-      outcome_id INTEGER,
+      appointment_type TEXT NOT NULL CHECK (appointment_type IN ('new', 'followup', 'dna')),
+      outcome_id INTEGER NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
       FOREIGN KEY (service_log_id) REFERENCES service_logs(id) ON DELETE CASCADE,

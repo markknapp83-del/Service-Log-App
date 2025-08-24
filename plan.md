@@ -391,6 +391,131 @@ describe('ServiceLogForm Component', () => {
 
 ---
 
+## Phase 3.5: Service Form Enhancements - Appointment Structure & Date Field
+**📚 PRIMARY DOCUMENTATION**: [React Hook Form](./devdocs/react-hook-form.md) + [Zod](./devdocs/zod.md) + [TypeScript](./devdocs/typescript.md)
+
+### Objectives
+Transform patient entry structure from count-based to appointment-based model and add service date tracking following documented form enhancement patterns.
+
+### 🚨 MANDATORY Pre-Phase Steps
+1. **Review [React Hook Form Documentation](./devdocs/react-hook-form.md)** - Array field patterns and dynamic form structures
+2. **Study [Zod Documentation](./devdocs/zod.md)** - Enum validation and schema transformation patterns
+3. **Check [TypeScript Documentation](./devdocs/typescript.md)** - Union types and enum patterns for appointment types
+4. **Follow documented component enhancement patterns** rather than creating new implementations
+
+### Key Changes Made
+
+#### 1. Patient Entry Structure Transformation
+**FROM**: Count-based model (New Patients: 3, Follow-up: 2, DNA: 1)  
+**TO**: Appointment-based model (Each entry = 1 appointment with type selection)
+
+- **New AppointmentType enum**:
+  ```typescript
+  export type AppointmentType = 'new' | 'followup' | 'dna';
+  ```
+
+- **Updated PatientEntry interface**:
+  ```typescript
+  export interface PatientEntry {
+    appointmentType: AppointmentType;
+    outcomeId: OutcomeId;
+  }
+  ```
+
+- **Enhanced form validation** with Zod enum schema:
+  ```typescript
+  const appointmentTypeSchema = z.enum(['new', 'followup', 'dna']);
+  const patientEntrySchema = z.object({
+    appointmentType: appointmentTypeSchema,
+    outcomeId: requiredStringSchema.uuid('Please select an outcome'),
+  });
+  ```
+
+#### 2. Service Date Field Addition
+- **Created DatePicker component** following documented Input component patterns
+- **Added serviceDate to form schema** with required validation
+- **Positioned between Activity/Specialty and Patient Count** as requested
+- **Integrated with React Hook Form** using register pattern
+
+#### 3. Form Logic Updates
+- **Dynamic row generation** based on patient count with appointment type dropdowns
+- **Updated calculation logic** to aggregate appointment types:
+  ```typescript
+  const calculateTotals = () => {
+    return watchPatientEntries.reduce((totals, entry) => ({
+      total: totals.total + 1,
+      new: totals.new + (entry.appointmentType === 'new' ? 1 : 0),
+      followup: totals.followup + (entry.appointmentType === 'followup' ? 1 : 0),
+      dna: totals.dna + (entry.appointmentType === 'dna' ? 1 : 0),
+    }), { total: 0, new: 0, followup: 0, dna: 0 });
+  };
+  ```
+
+### Critical Bug Fixes Implemented
+
+#### 1. Giant Exclamation Mark in Dropdowns
+- **Issue**: SVG icons scaling to massive proportions in Select components
+- **Root Cause**: Flexible SVG sizing without constraints
+- **Fix**: Added explicit sizing constraints with flex-shrink-0
+  ```typescript
+  <svg className="w-4 h-4 mr-1 flex-shrink-0" 
+       style={{ 
+         width: '16px', height: '16px', 
+         minWidth: '16px', minHeight: '16px', 
+         maxWidth: '16px', maxHeight: '16px' 
+       }}>
+  ```
+
+#### 2. Form Submission Failure
+- **Issue**: Save button not triggering any action
+- **Root Cause**: Toast API function name mismatches (`toast()` vs `showToast()`)
+- **Fix**: Updated all toast calls to use correct useToast hook API
+- **Updated calculation logic** for new appointment type structure
+
+#### 3. Infinite Toast Notification Loop
+- **Issue**: Screen flooded with continuous toast notifications preventing form visibility
+- **Root Cause**: useEffect dependency arrays including functions that changed on every render
+- **Fix**: Removed problematic dependencies and added state guards:
+  ```typescript
+  useEffect(() => {
+    localStorage.removeItem('serviceLogDraft');
+    loadFormOptions();
+  }, []); // No dependencies to prevent infinite loop
+  ```
+- **Added draft clearing mechanism** to prevent stuck localStorage data
+- **Reduced toast duration** from 5000ms to 3000ms for better UX
+
+### Files Modified
+- `frontend/src/components/DatePicker.tsx` (Created)
+- `frontend/src/types/index.ts` (Enhanced with AppointmentType enum)
+- `frontend/src/utils/validation.ts` (Updated Zod schemas)
+- `frontend/src/components/ServiceLogForm.tsx` (Major restructuring)
+- `frontend/src/pages/ServiceLogPage.tsx` (Toast fixes and calculation updates)
+- `frontend/src/components/Select.tsx` (SVG sizing fix)
+- `frontend/src/hooks/useToast.tsx` (Duration adjustment)
+
+### Technical Patterns Applied
+- **Documented enum patterns** from TypeScript documentation
+- **Array field management** from React Hook Form documentation
+- **Conditional validation** using Zod enum schemas
+- **Component enhancement** following shadcn/ui patterns
+- **useEffect optimization** to prevent infinite loops
+- **localStorage management** for draft persistence
+
+### Success Criteria
+- [x] Patient entries use appointment type selections instead of counts
+- [x] Service date field added in correct position
+- [x] Form calculations updated for new structure
+- [x] All dropdowns display correctly without visual artifacts
+- [x] Form submission works without errors
+- [x] Toast notifications function properly without infinite loops
+- [x] Auto-save functionality preserved
+- [x] Form validation maintains healthcare data integrity
+- [x] Summary section reflects appointment-based counting
+- [x] Mobile-responsive layout maintained
+
+---
+
 ## Phase 4: Admin Portal - User Management (Week 4)
 **📚 PRIMARY DOCUMENTATION**: [shadcn/ui](./devdocs/shadcn-ui.md) + [Express.js](./devdocs/express.md) + [React 18](./devdocs/react-18.md)
 

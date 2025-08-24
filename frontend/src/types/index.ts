@@ -143,12 +143,13 @@ export interface Outcome {
   updatedAt: ISODateString;
 }
 
+// Appointment types for patient entries
+export type AppointmentType = 'new' | 'followup' | 'dna'; // DNA = Did Not Attend
+
 export interface PatientEntry {
   readonly id?: string;
   serviceLogId?: ServiceLogId;
-  newPatients: number;
-  followupPatients: number;
-  dnaCount: number; // Did Not Attend
+  appointmentType: AppointmentType;
   outcomeId: OutcomeId;
 }
 
@@ -169,6 +170,7 @@ export interface ServiceLog {
 export interface ServiceLogFormData {
   clientId: string;
   activityId: string;
+  serviceDate: string; // ISO date string
   patientCount: number;
   patientEntries: PatientEntry[];
 }

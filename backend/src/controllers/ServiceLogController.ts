@@ -129,7 +129,7 @@ export class ServiceLogController {
         return next(new AppError('User not authenticated', 401));
       }
 
-      const { clientId, activityId, patientCount, patientEntries, isDraft = false } = req.body;
+      const { clientId, activityId, serviceDate, patientCount, patientEntries, isDraft = false } = req.body;
 
       // Validate that client, activity exist and are active
       const [client, activity] = await Promise.all([
@@ -158,11 +158,17 @@ export class ServiceLogController {
         }
       }
 
+      // Validate service date
+      if (!serviceDate) {
+        return next(new AppError('Service date is required', 400));
+      }
+
       // Start transaction
       const serviceLog = await this.serviceLogRepo.create({
         userId,
         clientId,
         activityId,
+        serviceDate,
         patientCount,
         isDraft,
         submittedAt: isDraft ? undefined : new Date().toISOString(),

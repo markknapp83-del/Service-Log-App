@@ -8,7 +8,8 @@ import {
   OutcomeId,
   UserId,
   PaginatedResult,
-  PaginationOptions 
+  PaginationOptions,
+  AppointmentType
 } from '@/types/index';
 
 export class PatientEntryRepository extends BaseRepository<PatientEntry, DatabasePatientEntry, PatientEntryId> {
@@ -21,10 +22,8 @@ export class PatientEntryRepository extends BaseRepository<PatientEntry, Databas
     return {
       id: dbRow.id,
       serviceLogId: dbRow.service_log_id,
-      newPatients: dbRow.new_patients,
-      followupPatients: dbRow.followup_patients,
-      dnaCount: dbRow.dna_count,
-      outcomeId: dbRow.outcome_id || undefined,
+      appointmentType: dbRow.appointment_type as AppointmentType,
+      outcomeId: dbRow.outcome_id,
       createdAt: dbRow.created_at,
       updatedAt: dbRow.updated_at
     };
@@ -36,9 +35,7 @@ export class PatientEntryRepository extends BaseRepository<PatientEntry, Databas
 
     if (domain.id !== undefined) result.id = domain.id;
     if (domain.serviceLogId !== undefined) result.service_log_id = domain.serviceLogId;
-    if (domain.newPatients !== undefined) result.new_patients = domain.newPatients;
-    if (domain.followupPatients !== undefined) result.followup_patients = domain.followupPatients;
-    if (domain.dnaCount !== undefined) result.dna_count = domain.dna_count;
+    if (domain.appointmentType !== undefined) result.appointment_type = domain.appointmentType;
     if (domain.outcomeId !== undefined) result.outcome_id = domain.outcomeId;
     if (domain.createdAt !== undefined) result.created_at = domain.createdAt;
     if (domain.updatedAt !== undefined) result.updated_at = domain.updatedAt;

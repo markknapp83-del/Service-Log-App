@@ -10,50 +10,38 @@ const requiredStringSchema = z.string()
   .min(1, 'This field is required')
   .trim();
 
+// Appointment type validation
+const appointmentTypeSchema = z.enum(['new', 'followup', 'dna'], {
+  errorMap: () => ({ message: 'Please select an appointment type' }),
+});
+
 // Patient entry schema - following medical data validation patterns
 const patientEntrySchema = z.object({
-  newPatients: positiveIntegerSchema,
-  followupPatients: positiveIntegerSchema,
-  dnaCount: positiveIntegerSchema.refine((val, ctx) => {
-    // DNA count should not exceed total patients
-    const entry = ctx.path[0];
-    if (typeof entry === 'object' && entry !== null) {
-      const entryObj = entry as any;
-      const total = entryObj.newPatients + entryObj.followupPatients;
-      return val <= total;
-    }
-    return true;
-  }, {
-    message: 'DNA count cannot exceed total patients',
-  }),
-  outcomeId: requiredStringSchema.uuid('Please select an outcome'),
-}).refine((data) => {
-  // At least one patient must be recorded
-  return data.newPatients + data.followupPatients > 0;
-}, {
-  message: 'At least one patient must be recorded',
-  path: ['newPatients'],
+  appointmentType: appointmentTypeSchema,
+  outcomeId: requiredStringSchema.min(1, 'Please select an outcome'),
 });
 
 // Service log form schema - following React Hook Form + Zod patterns
 export const serviceLogFormSchema = z.object({
-  clientId: requiredStringSchema.uuid('Please select a client/site'),
-  activityId: requiredStringSchema.uuid('Please select an activity'),
+  clientId: requiredStringSchema.min(1, 'Please select a client/site'),
+  activityId: requiredStringSchema.min(1, 'Please select an activity'),
+  serviceDate: z.string()
+    .min(1, 'Service date is required')
+    .refine((date) => {
+      const parsed = new Date(date);
+      return !isNaN(parsed.getTime()) && parsed <= new Date();
+    }, 'Service date must be a valid date and not in the future'),
   patientCount: z.number()
     .int('Patient count must be a whole number')
-    .min(1, 'At least 1 patient is required')
-    .max(100, 'Cannot exceed 100 patients per session'),
+    .min(1, 'At least 1 patient entry is required')
+    .max(100, 'Cannot exceed 100 patient entries per session'),
   patientEntries: z.array(patientEntrySchema)
     .min(1, 'At least one patient entry is required'),
 }).refine((data) => {
   // Validate that patient entries match patient count
-  const totalPatientsInEntries = data.patientEntries.reduce(
-    (sum, entry) => sum + entry.newPatients + entry.followupPatients,
-    0
-  );
-  return totalPatientsInEntries === data.patientCount;
+  return data.patientEntries.length === data.patientCount;
 }, {
-  message: 'Patient entries must match the total patient count',
+  message: 'Number of patient entries must match the patient count',
   path: ['patientEntries'],
 });
 
@@ -66,8 +54,12 @@ export const validatePatientCount = (count: number): boolean => {
 };
 
 export const validatePatientEntry = (entry: any): boolean => {
-  const result = patientEntrySchema.safeParse(entry);
-  return result.success;
+  try {
+    const result = patientEntrySchema.safeParse(entry);
+    return result.success;
+  } catch (error) {
+    return false;
+  }
 };
 
 // Error formatting function following Zod documentation
