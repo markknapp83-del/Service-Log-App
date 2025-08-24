@@ -6,6 +6,7 @@ import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ServiceLogPage } from './pages/ServiceLogPage';
+import { UserManagementPage } from './pages/UserManagementPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Toast } from './components/Toast';
 
@@ -41,12 +42,28 @@ function App() {
             
             {/* Admin-only routes */}
             <Route
+              path="/admin/users"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <UserManagementPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
               path="/admin/*"
               element={
                 <ProtectedRoute requiredRole="admin">
                   <div className="p-4">
                     <h1 className="text-2xl font-bold">Admin Panel</h1>
                     <p>Admin functionality will be implemented in future phases.</p>
+                    <div className="mt-4">
+                      <a 
+                        href="/admin/users" 
+                        className="text-blue-600 hover:text-blue-500 underline"
+                      >
+                        User Management
+                      </a>
+                    </div>
                   </div>
                 </ProtectedRoute>
               }

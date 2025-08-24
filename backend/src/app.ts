@@ -19,10 +19,16 @@ async function createApp() {
   // await seedDatabase();
 
   // Security middleware
-  app.use(helmet());
+  app.use(helmet({
+    crossOriginEmbedderPolicy: false,
+    contentSecurityPolicy: false
+  }));
   app.use(cors({
-    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000', 'http://localhost:3005'],
-    credentials: true
+    origin: ['http://localhost:3000', 'http://localhost:3005'],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    optionsSuccessStatus: 200
   }));
 
   // Rate limiting for API protection
@@ -67,6 +73,7 @@ async function createApp() {
 
   // Import routes
   const authRoutes = await import('@/routes/auth');
+  const adminRoutes = await import('@/routes/admin');
   // const serviceLogRoutes = await import('@/routes/serviceLogSimple');
 
   // Rate limiting for authentication endpoints
@@ -84,6 +91,7 @@ async function createApp() {
 
   // API routes
   app.use('/api/auth', authLimiter, authRoutes.default);
+  app.use('/api/admin', adminRoutes.default);
   
   // Temporary mock service log endpoints for demo
   app.get('/api/service-logs/options', (req, res) => {

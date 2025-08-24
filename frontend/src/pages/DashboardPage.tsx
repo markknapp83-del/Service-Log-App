@@ -139,7 +139,12 @@ export function DashboardPage() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    <Button variant="outline" size="sm" className="w-full" disabled>
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full"
+                      onClick={() => navigate('/admin/users')}
+                    >
                       User Management
                     </Button>
                     <Button variant="outline" size="sm" className="w-full" disabled>
@@ -150,7 +155,7 @@ export function DashboardPage() {
                     </Button>
                   </div>
                   <p className="text-xs text-gray-500 mt-3">
-                    Admin features will be implemented in Phase 4-5
+                    ✅ User Management ready! Other features coming in Phase 5-7
                   </p>
                 </CardContent>
               </Card>
@@ -161,22 +166,26 @@ export function DashboardPage() {
               <CardHeader>
                 <CardTitle>System Status</CardTitle>
                 <CardDescription>
-                  Phase 1: Authentication ✅
+                  Phases 1-4 Complete ✅
                 </CardDescription>
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
                   <div className="flex items-center">
                     <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
-                    <span className="text-sm">Authentication System</span>
+                    <span className="text-sm">Authentication System (Phase 1) ✅</span>
                   </div>
                   <div className="flex items-center">
                     <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
                     <span className="text-sm">Service Logging (Phase 3) ✅</span>
                   </div>
                   <div className="flex items-center">
+                    <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                    <span className="text-sm">User Management (Phase 4) ✅</span>
+                  </div>
+                  <div className="flex items-center">
                     <div className="w-3 h-3 bg-gray-300 rounded-full mr-3"></div>
-                    <span className="text-sm text-gray-500">Admin Portal (Phase 4-5)</span>
+                    <span className="text-sm text-gray-500">Template Management (Phase 5)</span>
                   </div>
                   <div className="flex items-center">
                     <div className="w-3 h-3 bg-gray-300 rounded-full mr-3"></div>

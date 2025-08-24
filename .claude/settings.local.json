@@ -32,7 +32,11 @@
       "Bash(start http://localhost:3004)",
       "Bash(find:*)",
       "Bash(npm test:*)",
-      "Bash(npm start)"
+      "Bash(npm start)",
+      "Read(/c:\\Users\\Mark\\Projects\\service-log-simple/**)",
+      "Read(/c:\\Users\\Mark\\Projects\\service-log-simple/**)",
+      "Bash(rm:*)",
+      "Read(/c:\\Users\\Mark\\Projects\\service-log-simple/**)"
     ],
     "deny": [],
     "ask": [],

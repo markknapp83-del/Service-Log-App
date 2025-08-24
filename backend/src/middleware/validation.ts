@@ -2,7 +2,7 @@
 import { Request, Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
 import { z, ZodSchema, ZodError } from 'zod';
-import { AppError } from '../utils/errors';
+import { ValidationError } from '../utils/errors';
 
 export const validate = (req: Request, res: Response, next: NextFunction): void => {
   const errors = validationResult(req);
@@ -14,7 +14,7 @@ export const validate = (req: Request, res: Response, next: NextFunction): void 
       value: error.type === 'field' ? error.value : undefined
     }));
 
-    throw new AppError('Validation failed', 400);
+    throw new ValidationError('Validation failed', errorMessages);
   }
   
   next();
