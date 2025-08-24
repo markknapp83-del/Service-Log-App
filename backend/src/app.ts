@@ -24,7 +24,16 @@ async function createApp() {
     contentSecurityPolicy: false
   }));
   app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:3005'],
+    origin: process.env.NODE_ENV === 'development' 
+      ? (origin, callback) => {
+          // Allow any localhost origin in development
+          if (!origin || origin.startsWith('http://localhost:') || origin.startsWith('https://localhost:')) {
+            callback(null, true);
+          } else {
+            callback(new Error('Not allowed by CORS'));
+          }
+        }
+      : (process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000']),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],

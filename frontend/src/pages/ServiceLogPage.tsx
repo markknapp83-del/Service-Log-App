@@ -27,43 +27,74 @@ export function ServiceLogPage() {
   const { showToast } = useToast();
 
   // Load form options from real API
-  useEffect(() => {
-    // Clear localStorage to prevent infinite loops from old draft data
-    localStorage.removeItem('serviceLogDraft');
-    
-    const loadFormOptions = async () => {
-      try {
-        setIsLoading(true);
+  const loadFormOptions = async () => {
+    try {
+      setIsLoading(true);
+      
+      // Use real API endpoint for form options
+      const response = await apiService.get('/service-logs/options');
+      
+      if (response.success) {
+        setFormOptions(response.data);
         
-        // Use real API endpoint for form options
-        const response = await apiService.get('/service-logs/options');
-        
-        if (response.success) {
-          setFormOptions(response.data);
-          
-          if (!demoModeShown) {
-            showToast({
-              type: 'success',
-              message: 'Form options loaded: Ready to create service log entries.',
-            });
-            setDemoModeShown(true);
-          }
-        } else {
-          throw new Error(response.error?.message || 'Failed to load form options');
+        if (!demoModeShown) {
+          showToast({
+            type: 'success',
+            message: 'Form options loaded: Ready to create service log entries.',
+          });
+          setDemoModeShown(true);
         }
-      } catch (error) {
-        console.error('Failed to load form options:', error);
-        showToast({
-          type: 'error',
-          message: `Failed to load form options: ${error instanceof Error ? error.message : 'Please refresh to try again.'}`,
-        });
-      } finally {
-        setIsLoading(false);
+      } else {
+        throw new Error(response.error?.message || 'Failed to load form options');
+      }
+    } catch (error) {
+      console.error('Failed to load form options:', error);
+      showToast({
+        type: 'error',
+        message: `Failed to load form options: ${error instanceof Error ? error.message : 'Please refresh to try again.'}`,
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    loadFormOptions();
+  }, []);
+
+  // Poll for template updates every 30 seconds when page is active
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (!document.hidden && formOptions) {
+        // Reload form options when page becomes visible (user switches back)
+        loadFormOptions();
       }
     };
 
-    loadFormOptions();
-  }, []); // Remove showToast dependency to prevent infinite loop
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    // Optional: Poll every 30 seconds for updates
+    const pollInterval = setInterval(() => {
+      if (!document.hidden && formOptions) {
+        loadFormOptions();
+      }
+    }, 30000);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(pollInterval);
+    };
+  }, [formOptions]);
+
+  // Function to manually refresh options
+  const handleRefreshOptions = async () => {
+    showToast({
+      type: 'info',
+      message: 'Refreshing form options...',
+    });
+    await loadFormOptions();
+  };
+
 
   const handleSubmit = async (data: ServiceLogFormData) => {
     try {
@@ -190,10 +221,25 @@ export function ServiceLogPage() {
               </h1>
               <p className="mt-1 text-sm text-neutral-600">
                 Record patient services and outcomes for healthcare tracking.
+                <br />
+                <span className="text-blue-600">Form options are automatically updated when you return to this page.</span>
               </p>
             </div>
             
-            <div className="mt-4 sm:mt-0">
+            <div className="mt-4 sm:mt-0 flex gap-2">
+              <Button
+                onClick={handleRefreshOptions}
+                variant="ghost"
+                size="sm"
+                className="text-blue-600 hover:text-blue-800"
+                disabled={isLoading}
+                title="Refresh form options to get latest templates"
+              >
+                <svg className="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                Refresh Options
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => window.history.back()}

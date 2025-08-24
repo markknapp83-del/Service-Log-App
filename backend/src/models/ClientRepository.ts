@@ -40,15 +40,14 @@ export class ClientRepository extends BaseRepository<Client, DatabaseClient, Cli
   // Find clients by name (case-insensitive search)
   async findByName(name: string): Promise<Client[]> {
     try {
-      const stmt = await this.db.prepare(`
+      const stmt = this.db.prepare(`
         SELECT * FROM ${this.tableName}
         WHERE LOWER(name) LIKE LOWER(?) 
-        AND (deleted_at IS NULL OR deleted_at = '')
         AND is_active = 1
         ORDER BY name ASC
       `);
 
-      const rows = await stmt.all(`%${name}%`) as DatabaseClient[];
+      const rows = stmt.all(`%${name}%`) as DatabaseClient[];
       return rows.map(row => this.fromDatabase(row));
     } catch (error) {
       throw new Error(`Failed to search clients by name: ${error}`);
@@ -58,14 +57,13 @@ export class ClientRepository extends BaseRepository<Client, DatabaseClient, Cli
   // Get all active clients
   async findActive(): Promise<Client[]> {
     try {
-      const stmt = await this.db.prepare(`
+      const stmt = this.db.prepare(`
         SELECT * FROM ${this.tableName}
         WHERE is_active = 1 
-        AND (deleted_at IS NULL OR deleted_at = '')
         ORDER BY name ASC
       `);
 
-      const rows = await stmt.all() as DatabaseClient[];
+      const rows = stmt.all() as DatabaseClient[];
       return rows.map(row => this.fromDatabase(row));
     } catch (error) {
       throw new Error(`Failed to find active clients: ${error}`);
@@ -108,45 +106,43 @@ export class ClientRepository extends BaseRepository<Client, DatabaseClient, Cli
   }
 
   // Update client with name uniqueness validation
-  async updateClient(id: ClientId, data: Partial<Client>, userId: string): Promise<Client> {
+  updateClient(id: ClientId, data: Partial<Client>, userId: string): Client {
     // Validate name uniqueness if name is being updated
     if (data.name) {
-      const nameExists = await this.isNameTaken(data.name, id);
+      const nameExists = this.isNameTaken(data.name, id);
       if (nameExists) {
         throw new Error(`Client name '${data.name}' already exists`);
       }
     }
 
-    return await this.update(id, data, userId);
+    return this.update(id, data, userId);
   }
 
   // Toggle client active status
-  async toggleActive(id: ClientId, userId: string): Promise<Client> {
-    const client = await this.findById(id);
+  toggleActive(id: ClientId, userId: string): Client {
+    const client = this.findById(id);
     if (!client) {
       throw new Error(`Client not found: ${id}`);
     }
 
-    return await this.update(id, { isActive: !client.isActive }, userId);
+    return this.update(id, { isActive: !client.isActive }, userId);
   }
 
   // Get clients with usage statistics
-  async findWithStats(): Promise<Array<Client & { serviceLogCount: number; lastUsed?: ISODateString }>> {
+  findWithStats(): Array<Client & { serviceLogCount: number; lastUsed?: ISODateString }> {
     try {
-      const stmt = await this.db.prepare(`
+      const stmt = this.db.prepare(`
         SELECT 
           c.*,
           COUNT(sl.id) as service_log_count,
           MAX(sl.created_at) as last_used
         FROM ${this.tableName} c
-        LEFT JOIN service_logs sl ON c.id = sl.client_id 
-          AND (sl.deleted_at IS NULL OR sl.deleted_at = '')
-        WHERE (c.deleted_at IS NULL OR c.deleted_at = '')
+        LEFT JOIN service_logs sl ON c.id = sl.client_id
         GROUP BY c.id
         ORDER BY c.name ASC
       `);
 
-      const rows = await stmt.all() as Array<DatabaseClient & { 
+      const rows = stmt.all() as Array<DatabaseClient & { 
         service_log_count: number; 
         last_used: string | null;
       }>;
@@ -173,12 +169,12 @@ export class ClientRepository extends BaseRepository<Client, DatabaseClient, Cli
 
     // Check against existing clients
     for (const client of clients) {
-      const nameExists = await this.isNameTaken(client.name);
+      const nameExists = this.isNameTaken(client.name);
       if (nameExists) {
         throw new Error(`Client name '${client.name}' already exists`);
       }
     }
 
-    return await this.bulkCreate(clients, userId);
+    return this.bulkCreate(clients, userId);
   }
 }

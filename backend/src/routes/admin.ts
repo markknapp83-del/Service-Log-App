@@ -137,4 +137,364 @@ router.post('/users/:id/reset-password',
   })
 );
 
+// ========================================
+// PHASE 5: TEMPLATE MANAGEMENT ROUTES
+// ========================================
+
+// GET /api/admin/templates/clients - List clients with stats
+router.get('/templates/clients',
+  asyncHandler(async (req, res) => {
+    await adminController.getClients(req, res);
+  })
+);
+
+// POST /api/admin/templates/clients - Create new client
+router.post('/templates/clients',
+  [
+    body('name')
+      .notEmpty()
+      .trim()
+      .isLength({ min: 2, max: 100 })
+      .withMessage('Client name must be between 2 and 100 characters'),
+    body('isActive')
+      .optional()
+      .isBoolean()
+      .withMessage('isActive must be a boolean value'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.createClient(req, res);
+  })
+);
+
+// PUT /api/admin/templates/clients/:id - Update client
+router.put('/templates/clients/:id',
+  [
+    param('id').isInt({ min: 1 }).withMessage('Invalid client ID'),
+    body('name')
+      .optional()
+      .trim()
+      .isLength({ min: 2, max: 100 })
+      .withMessage('Client name must be between 2 and 100 characters'),
+    body('isActive')
+      .optional()
+      .isBoolean()
+      .withMessage('isActive must be a boolean value'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.updateClient(req, res);
+  })
+);
+
+// DELETE /api/admin/templates/clients/:id - Delete client
+router.delete('/templates/clients/:id',
+  [
+    param('id').isInt({ min: 1 }).withMessage('Invalid client ID'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.deleteClient(req, res);
+  })
+);
+
+// GET /api/admin/templates/activities - List activities with stats
+router.get('/templates/activities',
+  asyncHandler(async (req, res) => {
+    await adminController.getActivities(req, res);
+  })
+);
+
+// POST /api/admin/templates/activities - Create new activity
+router.post('/templates/activities',
+  [
+    body('name')
+      .notEmpty()
+      .trim()
+      .isLength({ min: 2, max: 100 })
+      .withMessage('Activity name must be between 2 and 100 characters'),
+    body('isActive')
+      .optional()
+      .isBoolean()
+      .withMessage('isActive must be a boolean value'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.createActivity(req, res);
+  })
+);
+
+// PUT /api/admin/templates/activities/:id - Update activity
+router.put('/templates/activities/:id',
+  [
+    param('id').isInt({ min: 1 }).withMessage('Invalid activity ID'),
+    body('name')
+      .optional()
+      .trim()
+      .isLength({ min: 2, max: 100 })
+      .withMessage('Activity name must be between 2 and 100 characters'),
+    body('isActive')
+      .optional()
+      .isBoolean()
+      .withMessage('isActive must be a boolean value'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.updateActivity(req, res);
+  })
+);
+
+// DELETE /api/admin/templates/activities/:id - Delete activity
+router.delete('/templates/activities/:id',
+  [
+    param('id').isInt({ min: 1 }).withMessage('Invalid activity ID'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.deleteActivity(req, res);
+  })
+);
+
+// GET /api/admin/templates/outcomes - List outcomes with stats
+router.get('/templates/outcomes',
+  asyncHandler(async (req, res) => {
+    await adminController.getOutcomes(req, res);
+  })
+);
+
+// POST /api/admin/templates/outcomes - Create new outcome
+router.post('/templates/outcomes',
+  [
+    body('name')
+      .notEmpty()
+      .trim()
+      .isLength({ min: 2, max: 100 })
+      .withMessage('Outcome name must be between 2 and 100 characters'),
+    body('isActive')
+      .optional()
+      .isBoolean()
+      .withMessage('isActive must be a boolean value'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.createOutcome(req, res);
+  })
+);
+
+// PUT /api/admin/templates/outcomes/:id - Update outcome
+router.put('/templates/outcomes/:id',
+  [
+    param('id').isInt({ min: 1 }).withMessage('Invalid outcome ID'),
+    body('name')
+      .optional()
+      .trim()
+      .isLength({ min: 2, max: 100 })
+      .withMessage('Outcome name must be between 2 and 100 characters'),
+    body('isActive')
+      .optional()
+      .isBoolean()
+      .withMessage('isActive must be a boolean value'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.updateOutcome(req, res);
+  })
+);
+
+// DELETE /api/admin/templates/outcomes/:id - Delete outcome
+router.delete('/templates/outcomes/:id',
+  [
+    param('id').isInt({ min: 1 }).withMessage('Invalid outcome ID'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.deleteOutcome(req, res);
+  })
+);
+
+// GET /api/admin/templates/custom-fields - List custom fields with choices and stats
+router.get('/templates/custom-fields',
+  asyncHandler(async (req, res) => {
+    await adminController.getCustomFields(req, res);
+  })
+);
+
+// POST /api/admin/templates/custom-fields - Create new custom field
+router.post('/templates/custom-fields',
+  [
+    body('fieldLabel')
+      .notEmpty()
+      .trim()
+      .isLength({ min: 2, max: 100 })
+      .withMessage('Field label must be between 2 and 100 characters'),
+    body('fieldType')
+      .isIn(['dropdown', 'text', 'number', 'checkbox'])
+      .withMessage('Field type must be dropdown, text, number, or checkbox'),
+    body('fieldOrder')
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage('Field order must be a non-negative integer'),
+    body('isActive')
+      .optional()
+      .isBoolean()
+      .withMessage('isActive must be a boolean value'),
+    body('choices')
+      .optional()
+      .isArray({ min: 1 })
+      .withMessage('Choices must be a non-empty array for dropdown fields'),
+    body('choices.*.choiceText')
+      .if(body('choices').exists())
+      .notEmpty()
+      .trim()
+      .isLength({ min: 1, max: 100 })
+      .withMessage('Choice text must be between 1 and 100 characters'),
+    body('choices.*.choiceOrder')
+      .if(body('choices').exists())
+      .isInt({ min: 0 })
+      .withMessage('Choice order must be a non-negative integer'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.createCustomField(req, res);
+  })
+);
+
+// PUT /api/admin/templates/custom-fields/:id - Update custom field
+router.put('/templates/custom-fields/:id',
+  [
+    param('id').isInt({ min: 1 }).withMessage('Invalid custom field ID'),
+    body('fieldLabel')
+      .optional()
+      .trim()
+      .isLength({ min: 2, max: 100 })
+      .withMessage('Field label must be between 2 and 100 characters'),
+    body('fieldType')
+      .optional()
+      .isIn(['dropdown', 'text', 'number', 'checkbox'])
+      .withMessage('Field type must be dropdown, text, number, or checkbox'),
+    body('fieldOrder')
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage('Field order must be a non-negative integer'),
+    body('isActive')
+      .optional()
+      .isBoolean()
+      .withMessage('isActive must be a boolean value'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.updateCustomField(req, res);
+  })
+);
+
+// DELETE /api/admin/templates/custom-fields/:id - Delete custom field
+router.delete('/templates/custom-fields/:id',
+  [
+    param('id').isInt({ min: 1 }).withMessage('Invalid custom field ID'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.deleteCustomField(req, res);
+  })
+);
+
+// PUT /api/admin/templates/custom-fields/reorder - Update field orders
+router.put('/templates/custom-fields/reorder',
+  [
+    body('fieldOrders')
+      .isArray({ min: 1 })
+      .withMessage('fieldOrders must be a non-empty array'),
+    body('fieldOrders.*.id')
+      .isInt({ min: 1 })
+      .withMessage('Field ID must be a positive integer'),
+    body('fieldOrders.*.order')
+      .isInt({ min: 0 })
+      .withMessage('Order must be a non-negative integer'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.reorderCustomFields(req, res);
+  })
+);
+
+// GET /api/admin/templates/custom-fields/:id/choices - Get choices for a custom field
+router.get('/templates/custom-fields/:id/choices',
+  [
+    param('id').isInt({ min: 1 }).withMessage('Invalid custom field ID'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.getFieldChoices(req, res);
+  })
+);
+
+// POST /api/admin/templates/custom-fields/:id/choices - Create new choice for field
+router.post('/templates/custom-fields/:id/choices',
+  [
+    param('id').isInt({ min: 1 }).withMessage('Invalid custom field ID'),
+    body('choiceText')
+      .notEmpty()
+      .trim()
+      .isLength({ min: 1, max: 100 })
+      .withMessage('Choice text must be between 1 and 100 characters'),
+    body('choiceOrder')
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage('Choice order must be a non-negative integer'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.createFieldChoice(req, res);
+  })
+);
+
+// PUT /api/admin/templates/custom-fields/:fieldId/choices/:choiceId - Update choice
+router.put('/templates/custom-fields/:fieldId/choices/:choiceId',
+  [
+    param('fieldId').isInt({ min: 1 }).withMessage('Invalid custom field ID'),
+    param('choiceId').isInt({ min: 1 }).withMessage('Invalid choice ID'),
+    body('choiceText')
+      .notEmpty()
+      .trim()
+      .isLength({ min: 1, max: 100 })
+      .withMessage('Choice text must be between 1 and 100 characters'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.updateFieldChoice(req, res);
+  })
+);
+
+// DELETE /api/admin/templates/custom-fields/:fieldId/choices/:choiceId - Delete choice
+router.delete('/templates/custom-fields/:fieldId/choices/:choiceId',
+  [
+    param('fieldId').isInt({ min: 1 }).withMessage('Invalid custom field ID'),
+    param('choiceId').isInt({ min: 1 }).withMessage('Invalid choice ID'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.deleteFieldChoice(req, res);
+  })
+);
+
+// PUT /api/admin/templates/custom-fields/:id/choices/reorder - Update choice orders
+router.put('/templates/custom-fields/:id/choices/reorder',
+  [
+    param('id').isInt({ min: 1 }).withMessage('Invalid custom field ID'),
+    body('choiceOrders')
+      .isArray({ min: 1 })
+      .withMessage('choiceOrders must be a non-empty array'),
+    body('choiceOrders.*.id')
+      .isInt({ min: 1 })
+      .withMessage('Choice ID must be a positive integer'),
+    body('choiceOrders.*.order')
+      .isInt({ min: 0 })
+      .withMessage('Order must be a non-negative integer'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.reorderFieldChoices(req, res);
+  })
+);
+
 export default router;

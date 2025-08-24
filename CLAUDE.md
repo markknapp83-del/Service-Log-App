@@ -61,6 +61,16 @@ Building a healthcare service log portal for tracking patient services with dyna
 - **Auth**: JWT with bcrypt
 - **Forms**: React Hook Form + Zod
 
+## 🚨 CORS Configuration - CRITICAL
+**Backend CORS is configured to automatically allow ANY localhost port in development.**
+- **No manual CORS updates needed** - Ports 3000-9999 automatically work
+- **Backend uses flexible port** - Will auto-find available port (5000+ range)
+- **Frontend uses any available port** - Vite auto-assigns (3000+ range)
+- **If login fails with "Failed to fetch"**: 
+  1. Check backend is running: `curl http://localhost:5000/health`
+  2. Restart both servers: `npm run dev` in both frontend/ and backend/
+  3. CORS will automatically allow the new frontend port
+
 ## Agent Usage Guidelines
 
 ### ALWAYS Use Agents For:

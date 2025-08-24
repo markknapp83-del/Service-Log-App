@@ -1,5 +1,5 @@
 // Main App component following React 18 documentation patterns
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Link } from 'react-router-dom';
 import { AuthProvider } from './hooks/useAuth';
 import { ToastProvider } from './hooks/useToast';
 import { ProtectedRoute } from './components/ProtectedRoute';
@@ -7,6 +7,7 @@ import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
 import { ServiceLogPage } from './pages/ServiceLogPage';
 import { UserManagementPage } from './pages/UserManagementPage';
+import { TemplateManagementPage } from './pages/TemplateManagementPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Toast } from './components/Toast';
 
@@ -50,21 +51,10 @@ function App() {
               }
             />
             <Route
-              path="/admin/*"
+              path="/admin/templates"
               element={
                 <ProtectedRoute requiredRole="admin">
-                  <div className="p-4">
-                    <h1 className="text-2xl font-bold">Admin Panel</h1>
-                    <p>Admin functionality will be implemented in future phases.</p>
-                    <div className="mt-4">
-                      <a 
-                        href="/admin/users" 
-                        className="text-blue-600 hover:text-blue-500 underline"
-                      >
-                        User Management
-                      </a>
-                    </div>
-                  </div>
+                  <TemplateManagementPage />
                 </ProtectedRoute>
               }
             />
@@ -72,7 +62,38 @@ function App() {
             {/* Default redirect */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             
-            {/* Catch-all route */}
+            {/* Admin catch-all route - must come after specific admin routes */}
+            <Route
+              path="/admin/*"
+              element={
+                <ProtectedRoute requiredRole="admin">
+                  <div className="p-4">
+                    <h1 className="text-2xl font-bold">Admin Panel</h1>
+                    <p>Admin functionality is available in the following sections:</p>
+                    <div className="mt-4 space-y-2">
+                      <div>
+                        <Link 
+                          to="/admin/users" 
+                          className="text-blue-600 hover:text-blue-500 underline block"
+                        >
+                          User Management
+                        </Link>
+                      </div>
+                      <div>
+                        <Link 
+                          to="/admin/templates" 
+                          className="text-blue-600 hover:text-blue-500 underline block"
+                        >
+                          Template Management
+                        </Link>
+                      </div>
+                    </div>
+                  </div>
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Catch-all 404 route - must be last */}
             <Route
               path="*"
               element={
@@ -80,12 +101,12 @@ function App() {
                   <div className="text-center">
                     <h1 className="text-4xl font-bold text-gray-900 mb-4">404</h1>
                     <p className="text-gray-600 mb-4">Page not found</p>
-                    <a
-                      href="/dashboard"
+                    <Link
+                      to="/dashboard"
                       className="text-blue-600 hover:text-blue-500"
                     >
                       Return to Dashboard
-                    </a>
+                    </Link>
                   </div>
                 </div>
               }

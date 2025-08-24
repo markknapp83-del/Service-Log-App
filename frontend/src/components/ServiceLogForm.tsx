@@ -100,6 +100,9 @@ export function ServiceLogForm({
 
   // Generate patient rows based on patient count
   useEffect(() => {
+    // Don't auto-adjust entries if draft hasn't been loaded yet to prevent interference
+    if (!draftLoadedRef.current) return;
+    
     const currentEntries = watchPatientEntries || [];
     const desiredCount = watchPatientCount || 0;
     
@@ -112,7 +115,7 @@ export function ServiceLogForm({
       });
       replace(newEntries);
     }
-  }, [watchPatientCount, replace]);
+  }, [watchPatientCount, replace, watchPatientEntries]);
 
   // Auto-save draft functionality following documented patterns
   useEffect(() => {
@@ -143,19 +146,38 @@ export function ServiceLogForm({
       try {
         const draft = localStorage.getItem('serviceLogDraft');
         if (draft && !initialData) {
-          // Clear any old draft data that might be causing issues
-          localStorage.removeItem('serviceLogDraft');
-          console.log('Cleared old draft data to prevent infinite loading');
+          const draftData = JSON.parse(draft);
+          
+          // Validate draft data has required fields
+          if (draftData.clientId || draftData.activityId || draftData.serviceDate || 
+              (draftData.patientEntries && draftData.patientEntries.length > 0)) {
+            
+            console.log('Loading saved draft data');
+            reset(draftData);
+            
+            showToast({
+              type: 'info',
+              message: 'Draft restored: Your previous work has been recovered.',
+            });
+          } else {
+            // Clear empty draft
+            localStorage.removeItem('serviceLogDraft');
+            console.log('Cleared empty draft data');
+          }
         }
       } catch (error) {
         console.error('Failed to load draft:', error);
         localStorage.removeItem('serviceLogDraft');
+        showToast({
+          type: 'error',
+          message: 'Failed to restore draft. Starting with fresh form.',
+        });
       }
       draftLoadedRef.current = true;
     };
 
     loadDraft();
-  }, [reset, initialData]); // Remove showToast dependency to prevent infinite loop
+  }, [reset, initialData, showToast]);
 
   const handleFormSubmit = async (data: ServiceLogFormData) => {
     try {
