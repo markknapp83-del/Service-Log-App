@@ -2,14 +2,14 @@
 import { Router } from 'express';
 import { body } from 'express-validator';
 import { Request, Response, NextFunction } from 'express';
-import { UserRepository } from '@/models/UserRepository.js';
-import { AuthService } from '@/services/AuthService.js';
-import { JWTUtils } from '@/utils/jwt.js';
-import { validate } from '@/middleware/validation.js';
-import { authMiddleware } from '@/middleware/auth.js';
-import { asyncHandler } from '@/middleware/errorHandler.js';
-import { AuthenticationError } from '@/utils/errors.js';
-import { logger } from '@/utils/logger.js';
+import { UserRepository } from '@/models/UserRepository';
+import { AuthService } from '@/services/AuthService';
+import { JWTUtils } from '@/utils/jwt';
+import { validate } from '@/middleware/validation';
+import { authMiddleware } from '@/middleware/auth';
+import { asyncHandler } from '@/middleware/errorHandler';
+import { AuthenticationError } from '@/utils/errors';
+import { logger } from '@/utils/logger';
 
 const router = Router();
 const userRepository = new UserRepository();
@@ -33,19 +33,19 @@ router.post('/login',
 
     const result = await authService.login({ email, password });
 
-    if (!result.ok) {
+    if (!result.success) {
       throw new AuthenticationError(result.error);
     }
 
     logger.info('User login successful', { 
-      userId: result.value.user.id, 
-      email: result.value.user.email,
+      userId: result.data.user.id, 
+      email: result.data.user.email,
       ip: req.ip
     });
 
     res.json({
       success: true,
-      data: result.value,
+      data: result.data,
       timestamp: new Date().toISOString()
     });
   })
@@ -64,7 +64,7 @@ router.post('/refresh',
 
     const result = await authService.refreshToken(refreshToken);
 
-    if (!result.ok) {
+    if (!result.success) {
       throw new AuthenticationError(result.error);
     }
 
@@ -72,7 +72,7 @@ router.post('/refresh',
 
     res.json({
       success: true,
-      data: result.value,
+      data: result.data,
       timestamp: new Date().toISOString()
     });
   })
@@ -88,7 +88,7 @@ router.post('/logout',
     if (token) {
       const result = await authService.logout(token);
       
-      if (!result.ok) {
+      if (!result.success) {
         logger.warn('Logout failed', { error: result.error, userId: req.user?.id });
       }
     }

@@ -1,7 +1,7 @@
 // JWT utilities following TypeScript and security patterns
 import jwt from 'jsonwebtoken';
-import { JWTPayload, RefreshTokenPayload } from '@/types/index.js';
-import { logger } from './logger.js';
+import { JWTPayload, RefreshTokenPayload } from '@/types/index';
+import { logger } from './logger';
 
 export class JWTUtils {
   private readonly accessTokenSecret: string;

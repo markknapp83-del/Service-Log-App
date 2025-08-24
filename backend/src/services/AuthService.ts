@@ -1,16 +1,24 @@
 // Authentication service following service layer patterns
-import { UserRepository } from '@/models/UserRepository.js';
-import { JWTUtils } from '@/utils/jwt.js';
-import { logger } from '@/utils/logger.js';
+import { UserRepository } from '@/models/UserRepository';
+import { JWTUtils } from '@/utils/jwt';
+import { logger } from '@/utils/logger';
 import { 
   LoginRequest, 
   LoginResponse, 
   User, 
-  ApiResponse,
-  Result 
-} from '@/types/index.js';
-import { AuthenticationError, ValidationError } from '@/utils/errors.js';
+  ApiResponse
+} from '@/types/index';
+import { AuthenticationError, ValidationError } from '@/utils/errors';
 import bcrypt from 'bcryptjs';
+
+// Result type that matches test expectations
+type ServiceResult<T> = {
+  success: true;
+  data: T;
+} | {
+  success: false;
+  error: string;
+};
 
 export class AuthService {
   private jwtUtils: JWTUtils;
@@ -20,29 +28,29 @@ export class AuthService {
     this.jwtUtils = new JWTUtils();
   }
 
-  async login(loginData: LoginRequest): Promise<Result<LoginResponse, string>> {
+  async login(loginData: LoginRequest): Promise<ServiceResult<LoginResponse>> {
     try {
       // Validate input
       this.validateLoginData(loginData);
 
-      // Find user by email
-      const user = await this.userRepository.findByEmail(loginData.email);
+      // Find user by email (synchronous)
+      const user = this.userRepository.findByEmail(loginData.email);
       if (!user) {
         logger.warn('Login attempt with invalid email', { email: loginData.email });
-        return { ok: false, error: 'Invalid credentials' };
+        return { success: false, error: 'Invalid credentials' };
       }
 
       // Check if user is active
       if (!user.isActive) {
         logger.warn('Login attempt with inactive account', { userId: user.id });
-        return { ok: false, error: 'Account is inactive' };
+        return { success: false, error: 'Account is inactive' };
       }
 
       // Verify password
       const isPasswordValid = await bcrypt.compare(loginData.password, user.passwordHash);
       if (!isPasswordValid) {
         logger.warn('Login attempt with invalid password', { userId: user.id });
-        return { ok: false, error: 'Invalid credentials' };
+        return { success: false, error: 'Invalid credentials' };
       }
 
       // Generate tokens
@@ -57,8 +65,8 @@ export class AuthService {
         tokenVersion: 1 // For future token invalidation
       });
 
-      // Update last login
-      await this.userRepository.updateLastLogin(user.id);
+      // Update last login (synchronous)
+      this.userRepository.updateLastLogin(user.id);
 
       // Remove password hash from response
       const userResponse = this.excludePasswordHash(user);
@@ -68,8 +76,8 @@ export class AuthService {
       logger.info('User logged in successfully', { userId: user.id, email: user.email });
 
       return {
-        ok: true,
-        value: {
+        success: true,
+        data: {
           token: accessToken,
           refreshToken,
           user: userResponse,
@@ -78,45 +86,45 @@ export class AuthService {
       };
     } catch (error) {
       logger.error('Error during login', { error, email: loginData.email });
-      return { ok: false, error: 'Login failed' };
+      return { success: false, error: 'Login failed' };
     }
   }
 
-  async verifyToken(token: string): Promise<Result<Omit<User, 'passwordHash'>, string>> {
+  async verifyToken(token: string): Promise<ServiceResult<Omit<User, 'passwordHash'>>> {
     try {
       // Check if token is blacklisted
       if (this.tokenBlacklist.has(token)) {
-        return { ok: false, error: 'Token has been invalidated' };
+        return { success: false, error: 'Token has been invalidated' };
       }
 
       // Verify token
       const payload = this.jwtUtils.verifyAccessToken(token);
 
-      // Get user from database
-      const user = await this.userRepository.findById(payload.userId);
+      // Get user from database (synchronous)
+      const user = this.userRepository.findById(payload.userId);
       if (!user || !user.isActive) {
-        return { ok: false, error: 'User not found or inactive' };
+        return { success: false, error: 'User not found or inactive' };
       }
 
       return {
-        ok: true,
-        value: this.excludePasswordHash(user)
+        success: true,
+        data: this.excludePasswordHash(user)
       };
     } catch (error) {
       logger.debug('Token verification failed', { error: (error as Error).message });
-      return { ok: false, error: (error as Error).message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  async refreshToken(refreshTokenString: string): Promise<Result<{ token: string; expiresAt: string }, string>> {
+  async refreshToken(refreshTokenString: string): Promise<ServiceResult<{ token: string; expiresAt: string }>> {
     try {
       // Verify refresh token
       const payload = this.jwtUtils.verifyRefreshToken(refreshTokenString);
 
-      // Get user from database
-      const user = await this.userRepository.findById(payload.userId);
+      // Get user from database (synchronous)
+      const user = this.userRepository.findById(payload.userId);
       if (!user || !user.isActive) {
-        return { ok: false, error: 'User not found or inactive' };
+        return { success: false, error: 'User not found or inactive' };
       }
 
       // Generate new access token
@@ -131,19 +139,19 @@ export class AuthService {
       logger.debug('Token refreshed successfully', { userId: user.id });
 
       return {
-        ok: true,
-        value: {
+        success: true,
+        data: {
           token: newAccessToken,
           expiresAt
         }
       };
     } catch (error) {
       logger.debug('Token refresh failed', { error: (error as Error).message });
-      return { ok: false, error: (error as Error).message };
+      return { success: false, error: (error as Error).message };
     }
   }
 
-  async logout(token: string): Promise<Result<void, string>> {
+  async logout(token: string): Promise<ServiceResult<void>> {
     try {
       // Add token to blacklist
       this.tokenBlacklist.add(token);
@@ -153,10 +161,10 @@ export class AuthService {
       
       logger.debug('User logged out successfully');
       
-      return { ok: true, value: undefined };
+      return { success: true, data: undefined };
     } catch (error) {
       logger.error('Error during logout', { error });
-      return { ok: false, error: 'Logout failed' };
+      return { success: false, error: 'Logout failed' };
     }
   }
 

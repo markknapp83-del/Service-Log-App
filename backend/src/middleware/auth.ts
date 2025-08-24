@@ -1,11 +1,11 @@
 // Authentication middleware following Express.js documentation patterns
 import { Request, Response, NextFunction } from 'express';
-import { UserRepository } from '@/models/UserRepository.js';
-import { AuthService } from '@/services/AuthService.js';
-import { JWTUtils } from '@/utils/jwt.js';
-import { AuthenticationError, AuthorizationError } from '@/utils/errors.js';
-import { UserRole } from '@/types/index.js';
-import { logger } from '@/utils/logger.js';
+import { UserRepository } from '@/models/UserRepository';
+import { AuthService } from '@/services/AuthService';
+import { JWTUtils } from '@/utils/jwt';
+import { AuthenticationError, AuthorizationError } from '@/utils/errors';
+import { UserRole } from '@/types/index';
+import { logger } from '@/utils/logger';
 
 const userRepository = new UserRepository();
 const authService = new AuthService(userRepository);
@@ -27,7 +27,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     // Verify token and get user
     const result = await authService.verifyToken(token);
     
-    if (!result.ok) {
+    if (!result.success) {
       if (result.error === 'Token expired') {
         throw new AuthenticationError('Token expired');
       } else if (result.error === 'Invalid token') {
@@ -38,7 +38,7 @@ export const authMiddleware = async (req: Request, res: Response, next: NextFunc
     }
 
     // Add user to request object
-    req.user = result.value;
+    req.user = result.data;
     next();
   } catch (error) {
     if (error instanceof AuthenticationError) {
@@ -87,8 +87,8 @@ export const optionalAuth = async (req: Request, res: Response, next: NextFuncti
     // Verify token and get user
     const result = await authService.verifyToken(token);
     
-    if (result.ok) {
-      req.user = result.value;
+    if (result.success) {
+      req.user = result.data;
     }
     
     next();

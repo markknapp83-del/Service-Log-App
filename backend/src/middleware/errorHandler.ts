@@ -1,7 +1,7 @@
 // Error handling middleware following Express.js documentation patterns
 import { Request, Response, NextFunction } from 'express';
-import { logger } from '@/utils/logger.js';
-import { ApiError } from '@/utils/errors.js';
+import { logger } from '@/utils/logger';
+import { ApiError } from '@/utils/errors';
 
 export const errorHandler = (
   error: Error,

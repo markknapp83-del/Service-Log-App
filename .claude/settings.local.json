@@ -9,9 +9,37 @@
       "WebFetch(domain:zod.dev)",
       "WebFetch(domain:testing-library.com)",
       "Bash(git init:*)",
-      "Bash(git remote add:*)"
+      "Bash(git remote add:*)",
+      "Bash(npm install)",
+      "Bash(npm search:*)",
+      "Bash(npm install:*)",
+      "Bash(where claude_desktop)",
+      "Read(/C:\\Users\\Mark\\AppData\\Roaming/**)",
+      "Bash(dir:*)",
+      "Read(/C:\\Users\\Mark\\AppData\\Local/**)",
+      "Read(/C:\\Users\\Mark\\AppData\\Local\\claude-cli-nodejs/**)",
+      "Read(/C:\\Users\\Mark/**)",
+      "Read(/C:\\Users\\Mark\\.claude/**)",
+      "Read(/C:\\Users\\Mark\\.claude/**)",
+      "Read(/C:\\Users\\Mark\\.claude/**)",
+      "Bash(npx @playwright/mcp:*)",
+      "Bash(npx playwright:*)",
+      "Bash(npm test)",
+      "Bash(npm run dev:*)",
+      "Bash(node:*)",
+      "Bash(curl:*)",
+      "Bash(npm run:*)",
+      "Bash(start http://localhost:3004)",
+      "Bash(find:*)",
+      "Bash(npm test:*)",
+      "Bash(npm start)"
     ],
     "deny": [],
-    "ask": []
+    "ask": [],
+    "additionalDirectories": [
+      "C:\\Users\\Mark\\AppData\\Roaming",
+      "C:\\Users\\Mark\\.claude",
+      "C:\\c\\Users\\Mark\\Projects\\service-log-simple"
+    ]
   }
 }

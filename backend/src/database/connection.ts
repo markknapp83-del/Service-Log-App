@@ -1,35 +1,35 @@
 // Database connection following SQLite documentation patterns
-import sqlite3 from 'sqlite3';
-import { logger } from '@/utils/logger.js';
+import Database from 'better-sqlite3';
+import { logger } from '@/utils/logger';
 
 class DatabaseConnection {
-  private db: sqlite3.Database;
+  private db: Database.Database;
 
   constructor() {
     const dbPath = process.env.NODE_ENV === 'test' 
       ? ':memory:' 
       : (process.env.DB_PATH || './healthcare.db');
     
-    this.db = new sqlite3.Database(dbPath);
+    this.db = new Database(dbPath);
     
     // Enable foreign key constraints
-    this.db.run('PRAGMA foreign_keys = ON');
+    this.db.pragma('foreign_keys = ON');
     
     // Enable WAL mode for better concurrency
-    this.db.run('PRAGMA journal_mode = WAL');
+    this.db.pragma('journal_mode = WAL');
     
     // Set busy timeout to 30 seconds
-    this.db.run('PRAGMA busy_timeout = 30000');
+    this.db.pragma('busy_timeout = 30000');
     
     // Optimize performance
-    this.db.run('PRAGMA synchronous = NORMAL');
-    this.db.run('PRAGMA cache_size = 1000000');
-    this.db.run('PRAGMA temp_store = memory');
+    this.db.pragma('synchronous = NORMAL');
+    this.db.pragma('cache_size = 1000000');
+    this.db.pragma('temp_store = memory');
     
     logger.info('Database connected', { path: dbPath });
   }
 
-  getDb(): sqlite3.Database {
+  getDb(): Database.Database {
     return this.db;
   }
 
@@ -38,34 +38,30 @@ class DatabaseConnection {
     logger.info('Database connection closed');
   }
 
-  // Promise wrapper for run operations
-  run(sql: string, params?: any[]): Promise<sqlite3.RunResult> {
-    return new Promise((resolve, reject) => {
-      this.db.run(sql, params || [], function(err) {
-        if (err) reject(err);
-        else resolve(this);
-      });
-    });
+  // Direct access methods for better-sqlite3
+  prepare(sql: string) {
+    return this.db.prepare(sql);
   }
 
-  // Promise wrapper for get operations
-  get(sql: string, params?: any[]): Promise<any> {
-    return new Promise((resolve, reject) => {
-      this.db.get(sql, params || [], (err, row) => {
-        if (err) reject(err);
-        else resolve(row);
-      });
-    });
+  exec(sql: string) {
+    return this.db.exec(sql);
   }
 
-  // Promise wrapper for all operations
-  all(sql: string, params?: any[]): Promise<any[]> {
-    return new Promise((resolve, reject) => {
-      this.db.all(sql, params || [], (err, rows) => {
-        if (err) reject(err);
-        else resolve(rows);
-      });
-    });
+  run(sql: string, params?: any[]): Database.RunResult {
+    return this.db.prepare(sql).run(...(params || []));
+  }
+
+  get(sql: string, params?: any[]): any {
+    return this.db.prepare(sql).get(...(params || []));
+  }
+
+  all(sql: string, params?: any[]): any[] {
+    return this.db.prepare(sql).all(...(params || []));
+  }
+
+  // Transaction support
+  transaction<T>(fn: () => T): T {
+    return this.db.transaction(fn)();
   }
 }
 

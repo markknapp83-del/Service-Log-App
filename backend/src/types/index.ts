@@ -139,3 +139,266 @@ export interface Logger {
 export type Result<T, E = Error> = 
   | { ok: true; value: T }
   | { ok: false; error: E };
+
+// Healthcare Service Log Types - Following documented patterns
+
+// Service log domain types
+export type ServiceLogId = string;
+export type PatientEntryId = string;
+export type ClientId = number;
+export type ActivityId = number;
+export type OutcomeId = number;
+export type CustomFieldId = number;
+export type FieldChoiceId = number;
+
+// Healthcare domain interfaces
+export interface Client {
+  readonly id: ClientId;
+  name: string;
+  isActive: boolean;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export interface Activity {
+  readonly id: ActivityId;
+  name: string;
+  isActive: boolean;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export interface Outcome {
+  readonly id: OutcomeId;
+  name: string;
+  isActive: boolean;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+// Main service log entity
+export interface ServiceLog {
+  readonly id: ServiceLogId;
+  userId: UserId;
+  clientId: ClientId;
+  activityId: ActivityId;
+  patientCount: number;
+  isDraft: boolean;
+  submittedAt?: ISODateString;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+// Patient entry details
+export interface PatientEntry {
+  readonly id: PatientEntryId;
+  serviceLogId: ServiceLogId;
+  newPatients: number;
+  followupPatients: number;
+  dnaCount: number; // Did Not Attend
+  outcomeId?: OutcomeId;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+// Dynamic field system
+export type FieldType = 'dropdown' | 'text' | 'number' | 'checkbox';
+
+export interface CustomField {
+  readonly id: CustomFieldId;
+  fieldLabel: string;
+  fieldType: FieldType;
+  fieldOrder: number;
+  isActive: boolean;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export interface FieldChoice {
+  readonly id: FieldChoiceId;
+  fieldId: CustomFieldId;
+  choiceText: string;
+  choiceOrder: number;
+  createdAt: ISODateString;
+}
+
+export interface CustomFieldValue {
+  readonly id: string;
+  patientEntryId: PatientEntryId;
+  fieldId: CustomFieldId;
+  choiceId?: FieldChoiceId;
+  textValue?: string;
+  numberValue?: number;
+  checkboxValue?: boolean;
+  createdAt: ISODateString;
+}
+
+// Database row types (following documented patterns)
+export interface DatabaseServiceLog {
+  id: string;
+  user_id: string;
+  client_id: number;
+  activity_id: number;
+  patient_count: number;
+  is_draft: number;
+  submitted_at: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DatabasePatientEntry {
+  id: string;
+  service_log_id: string;
+  new_patients: number;
+  followup_patients: number;
+  dna_count: number;
+  outcome_id: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DatabaseClient {
+  id: number;
+  name: string;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DatabaseActivity {
+  id: number;
+  name: string;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DatabaseOutcome {
+  id: number;
+  name: string;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DatabaseCustomField {
+  id: number;
+  field_label: string;
+  field_type: string;
+  field_order: number;
+  is_active: number;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface DatabaseFieldChoice {
+  id: number;
+  field_id: number;
+  choice_text: string;
+  choice_order: number;
+  created_at: string;
+}
+
+export interface DatabaseCustomFieldValue {
+  id: string;
+  patient_entry_id: string;
+  field_id: number;
+  choice_id: number | null;
+  text_value: string | null;
+  number_value: number | null;
+  checkbox_value: number | null;
+  created_at: string;
+}
+
+// Request/Response types for API
+export type ServiceLogCreateRequest = Omit<ServiceLog, 'id' | 'createdAt' | 'updatedAt' | 'submittedAt'> & {
+  patientEntries: Array<Omit<PatientEntry, 'id' | 'serviceLogId' | 'createdAt' | 'updatedAt'>>;
+};
+
+export type ServiceLogUpdateRequest = Partial<Pick<ServiceLog, 'clientId' | 'activityId' | 'patientCount' | 'isDraft'>>;
+
+export type ClientCreateRequest = Omit<Client, 'id' | 'createdAt' | 'updatedAt'>;
+export type ActivityCreateRequest = Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>;
+export type OutcomeCreateRequest = Omit<Outcome, 'id' | 'createdAt' | 'updatedAt'>;
+
+export type CustomFieldCreateRequest = Omit<CustomField, 'id' | 'createdAt' | 'updatedAt'> & {
+  choices?: Array<Omit<FieldChoice, 'id' | 'fieldId' | 'createdAt'>>;
+};
+
+// Extended service log with related data
+export interface ServiceLogWithDetails extends ServiceLog {
+  client?: Client;
+  activity?: Activity;
+  user?: Pick<User, 'id' | 'firstName' | 'lastName'>;
+  patientEntries: Array<PatientEntry & {
+    outcome?: Outcome;
+    customFieldValues?: CustomFieldValue[];
+  }>;
+}
+
+// Pagination types
+export interface PaginationOptions {
+  page?: number;
+  limit?: number;
+  orderBy?: string;
+  order?: 'ASC' | 'DESC';
+}
+
+export interface PaginatedResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  limit: number;
+  totalPages: number;
+}
+
+// Filter types for service logs
+export interface ServiceLogFilters {
+  userId?: UserId;
+  clientId?: ClientId;
+  activityId?: ActivityId;
+  isDraft?: boolean;
+  startDate?: ISODateString;
+  endDate?: ISODateString;
+}
+
+// Audit log types
+export interface AuditLogEntry {
+  readonly id: number;
+  tableName: string;
+  recordId: string;
+  action: 'INSERT' | 'UPDATE' | 'DELETE';
+  oldValues?: Record<string, unknown>;
+  newValues?: Record<string, unknown>;
+  userId: UserId;
+  timestamp: ISODateString;
+}
+
+export interface DatabaseAuditLog {
+  id: number;
+  table_name: string;
+  record_id: string;
+  action: string;
+  old_values: string | null;
+  new_values: string | null;
+  user_id: string;
+  timestamp: string;
+}
+
+// Repository types for healthcare entities
+export type ServiceLogRepository = Repository<ServiceLog, ServiceLogId>;
+export type PatientEntryRepository = Repository<PatientEntry, PatientEntryId>;
+export type ClientRepository = Repository<Client, ClientId>;
+export type ActivityRepository = Repository<Activity, ActivityId>;
+export type OutcomeRepository = Repository<Outcome, OutcomeId>;
+export type CustomFieldRepository = Repository<CustomField, CustomFieldId>;
+
+// Service dependencies extended for healthcare
+export interface HealthcareServiceDependencies extends ServiceDependencies {
+  serviceLogRepo: ServiceLogRepository;
+  patientEntryRepo: PatientEntryRepository;
+  clientRepo: ClientRepository;
+  activityRepo: ActivityRepository;
+  outcomeRepo: OutcomeRepository;
+  customFieldRepo: CustomFieldRepository;
+}

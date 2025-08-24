@@ -1,8 +1,8 @@
 // Authentication API tests following Jest documentation patterns
 import { describe, test, expect, beforeAll, afterAll, beforeEach } from '@jest/globals';
 import request from 'supertest';
-import app from '@/app.js';
-import { UserRepository } from '@/models/UserRepository.js';
+import app from '@/app';
+import { UserRepository } from '@/models/UserRepository';
 import bcrypt from 'bcryptjs';
 
 describe('Authentication API', () => {

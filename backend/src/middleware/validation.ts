@@ -1,7 +1,7 @@
 // Validation middleware following Express.js documentation patterns
 import { Request, Response, NextFunction } from 'express';
 import { validationResult } from 'express-validator';
-import { ValidationError } from '@/utils/errors.js';
+import { ValidationError } from '@/utils/errors';
 
 export const validate = (req: Request, res: Response, next: NextFunction): void => {
   const errors = validationResult(req);

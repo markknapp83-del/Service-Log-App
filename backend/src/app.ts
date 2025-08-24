@@ -4,9 +4,9 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
-import { logger } from '@/utils/logger.js';
-import { errorHandler } from '@/middleware/errorHandler.js';
-import { initializeSchema } from '@/database/schema.js';
+import { logger } from '@/utils/logger';
+import { errorHandler } from '@/middleware/errorHandler';
+import { initializeSchema } from '@/database/schema';
 
 async function createApp() {
   const app = express();
@@ -14,14 +14,14 @@ async function createApp() {
   // Initialize database schema
   await initializeSchema();
   
-  // Seed database with demo users
-  const { seedDatabase } = await import('@/database/seed.js');
-  await seedDatabase();
+  // Temporarily disabled seeding to test connection
+  // const { seedDatabase } = await import('@/database/seed.js');
+  // await seedDatabase();
 
   // Security middleware
   app.use(helmet());
   app.use(cors({
-    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000'],
+    origin: process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000', 'http://localhost:3005'],
     credentials: true
   }));
 
