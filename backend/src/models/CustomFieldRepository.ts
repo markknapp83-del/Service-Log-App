@@ -17,6 +17,7 @@ export class CustomFieldRepository extends BaseRepository<CustomField, DatabaseC
   protected fromDatabase(dbRow: DatabaseCustomField): CustomField {
     return {
       id: dbRow.id,
+      clientId: dbRow.client_id || undefined, // Phase 6.5: Convert null to undefined
       fieldLabel: dbRow.field_label,
       fieldType: dbRow.field_type as FieldType,
       fieldOrder: dbRow.field_order,
@@ -31,6 +32,7 @@ export class CustomFieldRepository extends BaseRepository<CustomField, DatabaseC
     const result: Partial<DatabaseCustomField> = {};
 
     if (domain.id !== undefined) result.id = domain.id;
+    if (domain.clientId !== undefined) result.client_id = domain.clientId || null; // Phase 6.5: Convert undefined to null
     if (domain.fieldLabel !== undefined) result.field_label = domain.fieldLabel;
     if (domain.fieldType !== undefined) result.field_type = domain.fieldType;
     if (domain.fieldOrder !== undefined) result.field_order = domain.fieldOrder;
@@ -214,6 +216,159 @@ export class CustomFieldRepository extends BaseRepository<CustomField, DatabaseC
       return rows.map(row => this.fromDatabase(row));
     } catch (error) {
       throw new Error(`Failed to find custom fields by type: ${error}`);
+    }
+  }
+
+  // Phase 6.5: Client-specific field methods
+
+  // Get all fields for a specific client (including global fields)
+  async findByClientId(clientId: ClientId): Promise<CustomField[]> {
+    try {
+      const stmt = this.db.prepare(`
+        SELECT * FROM ${this.tableName}
+        WHERE (client_id = ? OR client_id IS NULL)
+        AND is_active = 1 
+        ORDER BY client_id ASC, field_order ASC, field_label ASC
+      `);
+
+      const rows = await stmt.all(clientId) as DatabaseCustomField[];
+      return rows.map(row => this.fromDatabase(row));
+    } catch (error) {
+      throw new Error(`Failed to find custom fields for client ${clientId}: ${error}`);
+    }
+  }
+
+  // Get only client-specific fields (excludes global fields)
+  async findClientSpecificFields(clientId: ClientId): Promise<CustomField[]> {
+    try {
+      const stmt = this.db.prepare(`
+        SELECT * FROM ${this.tableName}
+        WHERE client_id = ?
+        AND is_active = 1 
+        ORDER BY field_order ASC, field_label ASC
+      `);
+
+      const rows = await stmt.all(clientId) as DatabaseCustomField[];
+      return rows.map(row => this.fromDatabase(row));
+    } catch (error) {
+      throw new Error(`Failed to find client-specific fields for client ${clientId}: ${error}`);
+    }
+  }
+
+  // Get only global fields (client_id is null)
+  async findGlobalFields(): Promise<CustomField[]> {
+    try {
+      const stmt = this.db.prepare(`
+        SELECT * FROM ${this.tableName}
+        WHERE client_id IS NULL
+        AND is_active = 1 
+        ORDER BY field_order ASC, field_label ASC
+      `);
+
+      const rows = await stmt.all() as DatabaseCustomField[];
+      return rows.map(row => this.fromDatabase(row));
+    } catch (error) {
+      throw new Error(`Failed to find global custom fields: ${error}`);
+    }
+  }
+
+  // Check if field label is unique within client scope
+  isLabelTakenInClientScope(label: string, clientId?: ClientId, excludeId?: CustomFieldId): boolean {
+    try {
+      let query = `
+        SELECT COUNT(*) as count FROM ${this.tableName}
+        WHERE LOWER(field_label) = LOWER(?) 
+      `;
+      const params: any[] = [label];
+
+      // Check within the same client scope (client-specific or global)
+      if (clientId) {
+        query += ' AND client_id = ?';
+        params.push(clientId);
+      } else {
+        query += ' AND client_id IS NULL';
+      }
+
+      if (excludeId) {
+        query += ' AND id != ?';
+        params.push(excludeId);
+      }
+
+      const stmt = this.db.prepare(query);
+      const result = stmt.get(...params) as { count: number };
+      
+      return result.count > 0;
+    } catch (error) {
+      throw new Error(`Failed to check custom field label uniqueness in client scope: ${error}`);
+    }
+  }
+
+  // Create client-specific field with scope validation
+  createClientField(data: CustomFieldCreateRequest & { clientId: ClientId }, userId: string): CustomField {
+    // Validate label uniqueness within client scope
+    const labelExists = this.isLabelTakenInClientScope(data.fieldLabel, data.clientId);
+    if (labelExists) {
+      throw new Error(`Custom field label '${data.fieldLabel}' already exists for this client`);
+    }
+
+    // Set field order within client scope if not provided
+    if (data.fieldOrder === undefined) {
+      data.fieldOrder = this.getNextFieldOrderForClient(data.clientId);
+    }
+
+    return this.create(data as CustomFieldCreateRequest, userId);
+  }
+
+  // Get next field order within client scope
+  getNextFieldOrderForClient(clientId?: ClientId): number {
+    try {
+      let query = `
+        SELECT COALESCE(MAX(field_order), 0) + 1 as next_order 
+        FROM ${this.tableName}
+      `;
+      const params: any[] = [];
+
+      if (clientId) {
+        query += ' WHERE client_id = ?';
+        params.push(clientId);
+      } else {
+        query += ' WHERE client_id IS NULL';
+      }
+
+      const stmt = this.db.prepare(query);
+      const result = stmt.get(...params) as { next_order: number };
+      return result.next_order;
+    } catch (error) {
+      throw new Error(`Failed to get next field order for client: ${error}`);
+    }
+  }
+
+  // Update field orders within client scope
+  async updateClientFieldOrders(
+    fieldOrders: Array<{ id: CustomFieldId; order: number }>, 
+    clientId: ClientId | undefined,
+    userId: string
+  ): Promise<void> {
+    try {
+      const updateStmt = this.db.prepare(`
+        UPDATE ${this.tableName} 
+        SET field_order = ?, updated_at = datetime('now')
+        WHERE id = ? AND (client_id = ? OR (client_id IS NULL AND ? IS NULL))
+      `);
+
+      // Use transaction for atomic updates
+      this.db.transaction(() => {
+        for (const { id, order } of fieldOrders) {
+          updateStmt.run(order, id, clientId || null, clientId || null);
+          
+          // Log audit entry for each update
+          this.logAuditEntry(this.tableName, String(id), 'UPDATE', 
+            { field_order: 'previous_order' }, { field_order: order }, userId);
+        }
+      })();
+
+    } catch (error) {
+      throw new Error(`Failed to update client field orders: ${error}`);
     }
   }
 }

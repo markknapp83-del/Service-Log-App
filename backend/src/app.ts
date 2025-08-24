@@ -14,7 +14,7 @@ async function createApp() {
   // Initialize database schema
   await initializeSchema();
   
-  // Temporarily disable seeding to test basic functionality
+  // Temporarily disable seeding due to datatype issues
   // const { seedDatabase } = await import('@/database/seed');
   // await seedDatabase();
 
@@ -43,7 +43,7 @@ async function createApp() {
   // Rate limiting for API protection
   const limiter = rateLimit({
     windowMs: 15 * 60 * 1000, // 15 minutes
-    max: 100, // limit each IP to 100 requests per windowMs
+    max: process.env.NODE_ENV === 'production' ? 100 : 10000, // Very high limit for development
     message: {
       success: false,
       error: {
@@ -83,6 +83,7 @@ async function createApp() {
   // Import routes
   const authRoutes = await import('@/routes/auth');
   const adminRoutes = await import('@/routes/admin');
+  const customFieldRoutes = await import('@/routes/customFields');
   // const serviceLogRoutes = await import('@/routes/serviceLogSimple');
 
   // Rate limiting for authentication endpoints
@@ -101,6 +102,7 @@ async function createApp() {
   // API routes
   app.use('/api/auth', authLimiter, authRoutes.default);
   app.use('/api/admin', adminRoutes.default);
+  app.use('/api/custom-fields', customFieldRoutes.customFieldRoutes);
   
   // Temporary mock service log endpoints for demo
   app.get('/api/service-logs/options', (req, res) => {

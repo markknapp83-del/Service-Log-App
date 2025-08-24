@@ -18,7 +18,8 @@ export function createTables(): void {
       is_active INTEGER DEFAULT 1,
       last_login_at TEXT,
       created_at TEXT NOT NULL,
-      updated_at TEXT NOT NULL
+      updated_at TEXT NOT NULL,
+      deleted_at TEXT
     )
   `);
 
@@ -29,7 +30,8 @@ export function createTables(): void {
       name TEXT NOT NULL,
       is_active INTEGER DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      deleted_at TEXT
     )
   `);
 
@@ -40,7 +42,8 @@ export function createTables(): void {
       name TEXT NOT NULL,
       is_active INTEGER DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      deleted_at TEXT
     )
   `);
 
@@ -51,7 +54,8 @@ export function createTables(): void {
       name TEXT NOT NULL,
       is_active INTEGER DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+      updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      deleted_at TEXT
     )
   `);
 
@@ -88,18 +92,26 @@ export function createTables(): void {
     )
   `);
 
-  // Custom Fields table - for dynamic form fields
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS custom_fields (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      field_label TEXT NOT NULL,
-      field_type TEXT DEFAULT 'dropdown' CHECK (field_type IN ('dropdown', 'text', 'number', 'checkbox')),
-      field_order INTEGER,
-      is_active INTEGER DEFAULT 1,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
-    )
-  `);
+  try {
+    // Custom Fields table - for dynamic form fields (client-specific support)
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS custom_fields (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        client_id INTEGER,
+        field_label TEXT NOT NULL,
+        field_type TEXT DEFAULT 'dropdown' CHECK (field_type IN ('dropdown', 'text', 'number', 'checkbox')),
+        field_order INTEGER,
+        is_active INTEGER DEFAULT 1,
+        created_at TEXT NOT NULL DEFAULT (datetime('now')),
+        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+        FOREIGN KEY (client_id) REFERENCES clients(id)
+      )
+    `);
+    logger.info('✓ Custom Fields table with client_id created');
+  } catch (error) {
+    logger.error('❌ Failed to create custom_fields table', { error });
+    throw error;
+  }
 
   // Custom Field Choices table - for dropdown options
   db.exec(`
@@ -172,6 +184,8 @@ function createIndexes(): void {
   
   // Custom field indexes
   db.exec(`CREATE INDEX IF NOT EXISTS idx_custom_fields_active ON custom_fields (is_active, field_order)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_custom_fields_client ON custom_fields (client_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_custom_fields_client_active ON custom_fields (client_id, is_active, field_order)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_field_choices_field ON field_choices (field_id, choice_order)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_custom_field_values_entry ON custom_field_values (patient_entry_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_custom_field_values_field ON custom_field_values (field_id)`);
@@ -211,7 +225,13 @@ export function initializeSchema(): void {
     createTables();
     logger.info('Database schema initialized');
   } catch (error) {
-    logger.error('Failed to initialize database schema', { error });
+    logger.error('Failed to initialize database schema', { 
+      error: {
+        message: error instanceof Error ? error.message : String(error),
+        code: (error as any)?.code,
+        stack: error instanceof Error ? error.stack : undefined
+      }
+    });
     throw error;
   }
 }

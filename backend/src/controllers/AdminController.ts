@@ -989,4 +989,250 @@ export class AdminController {
       throw error;
     }
   }
+
+  // ========================================
+  // PHASE 6.5: CLIENT-SPECIFIC CUSTOM FIELDS
+  // ========================================
+
+  // GET /api/admin/clients/:clientId/fields - Get custom fields for specific client
+  async getClientFields(req: Request, res: Response): Promise<void> {
+    try {
+      const { clientId } = req.params;
+      const clientIdNum = parseInt(clientId, 10) as ClientId;
+
+      if (isNaN(clientIdNum) || clientIdNum < 1) {
+        throw new ValidationError('Invalid client ID');
+      }
+
+      // First verify client exists
+      const client = await this.clientRepository.findById(clientIdNum);
+      if (!client) {
+        throw new NotFoundError(`Client not found: ${clientIdNum}`);
+      }
+
+      // Get client-specific fields (excluding global fields)
+      const fields = await this.customFieldRepository.findClientSpecificFields(clientIdNum);
+
+      // Get choices for dropdown fields
+      const fieldsWithChoices = await Promise.all(
+        fields.map(async (field) => {
+          if (field.fieldType === 'dropdown') {
+            const choices = await this.fieldChoiceRepository.findByFieldId(field.id);
+            return { ...field, choices };
+          }
+          return { ...field, choices: [] };
+        })
+      );
+
+      res.json({
+        success: true,
+        data: {
+          client,
+          fields: fieldsWithChoices
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('Error fetching client fields', { error, clientId: req.params.clientId });
+      throw error;
+    }
+  }
+
+  // POST /api/admin/clients/:clientId/fields - Create client-specific custom field
+  async createClientField(req: Request, res: Response): Promise<void> {
+    try {
+      const { clientId } = req.params;
+      const clientIdNum = parseInt(clientId, 10) as ClientId;
+      const { fieldLabel, fieldType, fieldOrder, isActive = true, choices } = req.body;
+
+      if (isNaN(clientIdNum) || clientIdNum < 1) {
+        throw new ValidationError('Invalid client ID');
+      }
+
+      // Verify client exists
+      const client = await this.clientRepository.findById(clientIdNum);
+      if (!client) {
+        throw new NotFoundError(`Client not found: ${clientIdNum}`);
+      }
+
+      // Create field data with client association
+      const fieldData = {
+        clientId: clientIdNum,
+        fieldLabel,
+        fieldType,
+        fieldOrder,
+        isActive,
+        choices: choices || []
+      };
+
+      const field = this.customFieldRepository.createClientField(fieldData, req.user!.id);
+
+      // Create choices if provided and field type is dropdown
+      if (fieldType === 'dropdown' && choices && choices.length > 0) {
+        for (const choice of choices) {
+          await this.fieldChoiceRepository.create({
+            fieldId: field.id,
+            choiceText: choice.choiceText,
+            choiceOrder: choice.choiceOrder
+          }, req.user!.id);
+        }
+      }
+
+      // Fetch the field with choices for response
+      const fieldWithChoices = fieldType === 'dropdown'
+        ? {
+            ...field,
+            choices: await this.fieldChoiceRepository.findByFieldId(field.id)
+          }
+        : { ...field, choices: [] };
+
+      logger.info('Admin created client-specific custom field', { 
+        createdBy: req.user?.id,
+        clientId: clientIdNum,
+        fieldId: field.id,
+        fieldLabel
+      });
+
+      res.status(201).json({
+        success: true,
+        data: fieldWithChoices,
+        message: 'Client-specific custom field created successfully',
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('Error creating client field', { error, createdBy: req.user?.id, clientId: req.params.clientId });
+      throw error;
+    }
+  }
+
+  // PUT /api/admin/clients/:clientId/fields/:fieldId - Update client-specific custom field
+  async updateClientField(req: Request, res: Response): Promise<void> {
+    try {
+      const { clientId, fieldId } = req.params;
+      const clientIdNum = parseInt(clientId, 10) as ClientId;
+      const fieldIdNum = parseInt(fieldId, 10) as CustomFieldId;
+      const updateData = req.body;
+
+      if (isNaN(clientIdNum) || clientIdNum < 1) {
+        throw new ValidationError('Invalid client ID');
+      }
+      if (isNaN(fieldIdNum) || fieldIdNum < 1) {
+        throw new ValidationError('Invalid field ID');
+      }
+
+      // Verify client exists
+      const client = await this.clientRepository.findById(clientIdNum);
+      if (!client) {
+        throw new NotFoundError(`Client not found: ${clientIdNum}`);
+      }
+
+      // Verify field exists and belongs to client
+      const existingField = await this.customFieldRepository.findById(fieldIdNum);
+      if (!existingField) {
+        throw new NotFoundError(`Custom field not found: ${fieldIdNum}`);
+      }
+      if (existingField.clientId !== clientIdNum) {
+        throw new ValidationError(`Field ${fieldIdNum} does not belong to client ${clientIdNum}`);
+      }
+
+      const field = await this.customFieldRepository.updateField(fieldIdNum, updateData, req.user!.id);
+
+      logger.info('Admin updated client-specific custom field', { 
+        updatedBy: req.user?.id,
+        clientId: clientIdNum,
+        fieldId: fieldIdNum
+      });
+
+      res.json({
+        success: true,
+        data: field,
+        message: 'Client-specific custom field updated successfully',
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('Error updating client field', { error, updatedBy: req.user?.id, clientId: req.params.clientId, fieldId: req.params.fieldId });
+      throw error;
+    }
+  }
+
+  // DELETE /api/admin/clients/:clientId/fields/:fieldId - Delete client-specific custom field
+  async deleteClientField(req: Request, res: Response): Promise<void> {
+    try {
+      const { clientId, fieldId } = req.params;
+      const clientIdNum = parseInt(clientId, 10) as ClientId;
+      const fieldIdNum = parseInt(fieldId, 10) as CustomFieldId;
+
+      if (isNaN(clientIdNum) || clientIdNum < 1) {
+        throw new ValidationError('Invalid client ID');
+      }
+      if (isNaN(fieldIdNum) || fieldIdNum < 1) {
+        throw new ValidationError('Invalid field ID');
+      }
+
+      // Verify field exists and belongs to client
+      const existingField = await this.customFieldRepository.findById(fieldIdNum);
+      if (!existingField) {
+        throw new NotFoundError(`Custom field not found: ${fieldIdNum}`);
+      }
+      if (existingField.clientId !== clientIdNum) {
+        throw new ValidationError(`Field ${fieldIdNum} does not belong to client ${clientIdNum}`);
+      }
+
+      await this.customFieldRepository.delete(fieldIdNum);
+
+      logger.info('Admin deleted client-specific custom field', { 
+        deletedBy: req.user?.id,
+        clientId: clientIdNum,
+        fieldId: fieldIdNum,
+        fieldLabel: existingField.fieldLabel
+      });
+
+      res.json({
+        success: true,
+        message: 'Client-specific custom field deleted successfully',
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('Error deleting client field', { error, deletedBy: req.user?.id, clientId: req.params.clientId, fieldId: req.params.fieldId });
+      throw error;
+    }
+  }
+
+  // GET /api/form-config/:clientId - Get form configuration for specific client (used by service log form)
+  async getFormConfig(req: Request, res: Response): Promise<void> {
+    try {
+      const { clientId } = req.params;
+      const clientIdNum = parseInt(clientId, 10) as ClientId;
+
+      if (isNaN(clientIdNum) || clientIdNum < 1) {
+        throw new ValidationError('Invalid client ID');
+      }
+
+      // Get all fields for this client (client-specific + global)
+      const fields = await this.customFieldRepository.findByClientId(clientIdNum);
+
+      // Get choices for dropdown fields
+      const fieldsWithChoices = await Promise.all(
+        fields.map(async (field) => {
+          if (field.fieldType === 'dropdown') {
+            const choices = await this.fieldChoiceRepository.findByFieldId(field.id);
+            return { ...field, choices };
+          }
+          return { ...field, choices: [] };
+        })
+      );
+
+      res.json({
+        success: true,
+        data: {
+          clientId: clientIdNum,
+          fields: fieldsWithChoices
+        },
+        timestamp: new Date().toISOString()
+      });
+    } catch (error) {
+      logger.error('Error fetching form config for client', { error, clientId: req.params.clientId });
+      throw error;
+    }
+  }
 }

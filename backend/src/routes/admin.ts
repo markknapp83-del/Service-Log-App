@@ -497,4 +497,112 @@ router.put('/templates/custom-fields/:id/choices/reorder',
   })
 );
 
+// ========================================
+// PHASE 6.5: CLIENT-SPECIFIC CUSTOM FIELDS
+// ========================================
+
+// GET /api/admin/clients/:clientId/fields - Get custom fields for specific client
+router.get('/clients/:clientId/fields',
+  [
+    param('clientId').isInt({ min: 1 }).withMessage('Invalid client ID'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.getClientFields(req, res);
+  })
+);
+
+// POST /api/admin/clients/:clientId/fields - Create client-specific custom field
+router.post('/clients/:clientId/fields',
+  [
+    param('clientId').isInt({ min: 1 }).withMessage('Invalid client ID'),
+    body('fieldLabel')
+      .notEmpty()
+      .trim()
+      .isLength({ min: 2, max: 100 })
+      .withMessage('Field label must be between 2 and 100 characters'),
+    body('fieldType')
+      .isIn(['dropdown', 'text', 'number', 'checkbox'])
+      .withMessage('Field type must be dropdown, text, number, or checkbox'),
+    body('fieldOrder')
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage('Field order must be a non-negative integer'),
+    body('isActive')
+      .optional()
+      .isBoolean()
+      .withMessage('isActive must be a boolean value'),
+    body('choices')
+      .optional()
+      .isArray({ min: 1 })
+      .withMessage('Choices must be a non-empty array for dropdown fields'),
+    body('choices.*.choiceText')
+      .if(body('choices').exists())
+      .notEmpty()
+      .trim()
+      .isLength({ min: 1, max: 100 })
+      .withMessage('Choice text must be between 1 and 100 characters'),
+    body('choices.*.choiceOrder')
+      .if(body('choices').exists())
+      .isInt({ min: 0 })
+      .withMessage('Choice order must be a non-negative integer'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.createClientField(req, res);
+  })
+);
+
+// PUT /api/admin/clients/:clientId/fields/:fieldId - Update client-specific custom field
+router.put('/clients/:clientId/fields/:fieldId',
+  [
+    param('clientId').isInt({ min: 1 }).withMessage('Invalid client ID'),
+    param('fieldId').isInt({ min: 1 }).withMessage('Invalid field ID'),
+    body('fieldLabel')
+      .optional()
+      .trim()
+      .isLength({ min: 2, max: 100 })
+      .withMessage('Field label must be between 2 and 100 characters'),
+    body('fieldType')
+      .optional()
+      .isIn(['dropdown', 'text', 'number', 'checkbox'])
+      .withMessage('Field type must be dropdown, text, number, or checkbox'),
+    body('fieldOrder')
+      .optional()
+      .isInt({ min: 0 })
+      .withMessage('Field order must be a non-negative integer'),
+    body('isActive')
+      .optional()
+      .isBoolean()
+      .withMessage('isActive must be a boolean value'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.updateClientField(req, res);
+  })
+);
+
+// DELETE /api/admin/clients/:clientId/fields/:fieldId - Delete client-specific custom field
+router.delete('/clients/:clientId/fields/:fieldId',
+  [
+    param('clientId').isInt({ min: 1 }).withMessage('Invalid client ID'),
+    param('fieldId').isInt({ min: 1 }).withMessage('Invalid field ID'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.deleteClientField(req, res);
+  })
+);
+
+// GET /api/form-config/:clientId - Get form configuration for specific client (used by service log form)
+router.get('/form-config/:clientId',
+  [
+    param('clientId').isInt({ min: 1 }).withMessage('Invalid client ID'),
+    validate
+  ],
+  asyncHandler(async (req, res) => {
+    await adminController.getFormConfig(req, res);
+  })
+);
+
 export default router;

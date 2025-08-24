@@ -9,7 +9,12 @@ import { Input } from './Input';
 import { DatePicker } from './DatePicker';
 import { Card } from './Card';
 import { Select, SelectOption } from './Select';
+import { DynamicFieldGroup } from './DynamicField';
+import { ClientFieldModal } from './ClientFieldModal';
 import { useToast } from '../hooks/useToast';
+import { useClientCustomFields } from '../hooks/useClientCustomFields';
+import { useClientFieldManagement } from '../hooks/useClientCustomFields';
+import { useAuth } from '../hooks/useAuth';
 import { serviceLogFormSchema, ServiceLogFormData, formatValidationError } from '../utils/validation';
 import { 
   ServiceLogFormProps, 
@@ -37,7 +42,9 @@ export function ServiceLogForm({
   isLoading = false
 }: ServiceLogFormComponentProps) {
   const [isDraftSaving, setIsDraftSaving] = useState(false);
+  const [showCreateFieldModal, setShowCreateFieldModal] = useState(false);
   const { showToast } = useToast();
+  const { user } = useAuth();
   const draftLoadedRef = useRef(false);
 
   const {
@@ -58,6 +65,8 @@ export function ServiceLogForm({
       serviceDate: initialData?.serviceDate || '',
       patientCount: initialData?.patientCount || 1,
       patientEntries: initialData?.patientEntries || [],
+      customFields: initialData?.customFields || {},
+      additionalNotes: initialData?.additionalNotes || '',
     },
   });
 
@@ -68,6 +77,26 @@ export function ServiceLogForm({
 
   const watchPatientCount = watch('patientCount');
   const watchPatientEntries = watch('patientEntries');
+  const watchClientId = watch('clientId');
+  
+  // Client-specific custom fields integration
+  const { 
+    fields: customFields, 
+    isLoading: customFieldsLoading,
+    error: customFieldsError,
+    refreshFields
+  } = useClientCustomFields({ 
+    clientId: watchClientId || undefined,
+    loadOnMount: true 
+  });
+
+  // Client field management (for admin users)
+  const { 
+    createField,
+    isLoading: isCreatingField
+  } = useClientFieldManagement({ 
+    clientId: watchClientId || undefined
+  });
 
   // Options for dropdowns
   const clientOptions: SelectOption[] = clients
@@ -204,6 +233,8 @@ export function ServiceLogForm({
       serviceDate: '',
       patientCount: 1,
       patientEntries: [],
+      customFields: {},
+      additionalNotes: '',
     });
     localStorage.removeItem('serviceLogDraft');
     draftLoadedRef.current = false; // Allow draft loading again
@@ -228,6 +259,18 @@ export function ServiceLogForm({
   };
 
   const totals = calculateTotals();
+
+  // Handle field creation
+  const handleCreateField = async (fieldData: any) => {
+    try {
+      await createField(fieldData);
+      await refreshFields(); // Refresh the form fields
+      setShowCreateFieldModal(false);
+    } catch (error) {
+      // Error handling is done in the hook
+      console.error('Field creation failed:', error);
+    }
+  };
 
   return (
     <form onSubmit={handleSubmit(handleFormSubmit)} className="space-y-6 max-w-4xl mx-auto">
@@ -367,6 +410,7 @@ export function ServiceLogForm({
                     />
                   </div>
                 </div>
+
               </div>
             ))}
           </div>
@@ -397,6 +441,106 @@ export function ServiceLogForm({
           </div>
         </Card>
       )}
+
+      {/* Additional Information Section */}
+      <Card className="p-6">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-medium text-neutral-900">Additional Information</h2>
+          {user?.role === 'admin' && watchClientId && (
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() => setShowCreateFieldModal(true)}
+              className="flex items-center"
+            >
+              <Plus className="w-4 h-4 mr-2" />
+              Add New Capture
+            </Button>
+          )}
+        </div>
+
+        {/* Client-Specific Custom Fields */}
+        {customFields.length > 0 ? (
+          <div className="space-y-6">
+            {customFields.map((field) => (
+              <div key={field.id} className="space-y-2">
+                <label className="block text-sm font-medium text-neutral-700">
+                  {field.fieldLabel}
+                  {field.isRequired && <span className="text-red-500 ml-1">*</span>}
+                </label>
+                
+                {field.fieldType === 'dropdown' && field.choices && (
+                  <Select
+                    options={field.choices.map(choice => ({
+                      value: choice.id,
+                      label: choice.choiceText,
+                    }))}
+                    value={watch(`customFields.${field.id}`) || ''}
+                    onValueChange={(value) => 
+                      setValue(`customFields.${field.id}`, value, { shouldValidate: true })
+                    }
+                    placeholder={`Select ${field.fieldLabel.toLowerCase()}`}
+                    error={errors.customFields?.[field.id]?.message}
+                  />
+                )}
+
+                {field.fieldType === 'text' && (
+                  <Input
+                    {...register(`customFields.${field.id}`)}
+                    placeholder={`Enter ${field.fieldLabel.toLowerCase()}`}
+                    error={errors.customFields?.[field.id]?.message}
+                  />
+                )}
+
+                {field.fieldType === 'number' && (
+                  <Input
+                    type="number"
+                    {...register(`customFields.${field.id}`, { valueAsNumber: true })}
+                    placeholder={`Enter ${field.fieldLabel.toLowerCase()}`}
+                    error={errors.customFields?.[field.id]?.message}
+                  />
+                )}
+
+                {field.fieldType === 'date' && (
+                  <DatePicker
+                    {...register(`customFields.${field.id}`)}
+                    placeholder={`Select ${field.fieldLabel.toLowerCase()}`}
+                    error={errors.customFields?.[field.id]?.message}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        ) : watchClientId ? (
+          <div className="text-center py-8 text-neutral-500">
+            <p className="text-sm">No additional fields configured for this client.</p>
+            {user?.role === 'admin' && (
+              <p className="text-xs mt-1">Click "Add New Capture" to create custom fields for this client.</p>
+            )}
+          </div>
+        ) : (
+          <div className="text-center py-8 text-neutral-500">
+            <p className="text-sm">Select a client to see additional fields.</p>
+          </div>
+        )}
+
+        {/* Always show Additional Notes field */}
+        <div className="mt-6 pt-6 border-t border-neutral-200">
+          <label className="block text-sm font-medium text-neutral-700 mb-2">
+            Additional Notes
+          </label>
+          <textarea
+            {...register('additionalNotes')}
+            rows={4}
+            className="w-full px-3 py-2 border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 resize-vertical"
+            placeholder="Optional: Any additional notes about this service entry..."
+          />
+          {errors.additionalNotes && (
+            <p className="mt-1 text-sm text-red-600">{errors.additionalNotes.message}</p>
+          )}
+        </div>
+      </Card>
 
       {/* Form Actions */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pt-6 border-t border-neutral-200 space-y-4 sm:space-y-0">
@@ -445,6 +589,17 @@ export function ServiceLogForm({
           </Button>
         </div>
       </div>
+
+      {/* Client Field Creation Modal */}
+      {user?.role === 'admin' && watchClientId && (
+        <ClientFieldModal
+          isOpen={showCreateFieldModal}
+          onClose={() => setShowCreateFieldModal(false)}
+          clientId={watchClientId}
+          clientName={clients.find(c => c.id === watchClientId)?.name}
+          onSave={handleCreateField}
+        />
+      )}
     </form>
   );
 }

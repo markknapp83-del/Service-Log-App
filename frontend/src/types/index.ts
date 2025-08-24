@@ -183,16 +183,18 @@ export interface ServiceLogFormProps {
 }
 
 // Custom Field Types - For Phase 6 dynamic fields
+export type FieldType = 'dropdown' | 'text' | 'number' | 'checkbox';
+
 export interface CustomField {
   readonly id: string;
   fieldLabel: string;
-  fieldType: 'dropdown' | 'text' | 'number';
+  fieldType: FieldType;
   fieldOrder: number;
   isActive: boolean;
-  choices?: CustomFieldChoice[];
+  choices?: FieldChoice[];
 }
 
-export interface CustomFieldChoice {
+export interface FieldChoice {
   readonly id: string;
   fieldId: string;
   choiceText: string;
@@ -206,4 +208,8 @@ export interface CustomFieldValue {
   choiceId?: string;
   textValue?: string;
   numberValue?: number;
+  checkboxValue?: boolean;
 }
+
+// Legacy alias for backward compatibility
+export interface CustomFieldChoice extends FieldChoice {}

@@ -37,6 +37,8 @@ export const serviceLogFormSchema = z.object({
     .max(100, 'Cannot exceed 100 patient entries per session'),
   patientEntries: z.array(patientEntrySchema)
     .min(1, 'At least one patient entry is required'),
+  customFields: z.record(z.string(), z.any()).optional(),
+  additionalNotes: z.string().optional(),
 }).refine((data) => {
   // Validate that patient entries match patient count
   return data.patientEntries.length === data.patientCount;

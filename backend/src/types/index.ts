@@ -207,6 +207,7 @@ export type FieldType = 'dropdown' | 'text' | 'number' | 'checkbox';
 
 export interface CustomField {
   readonly id: CustomFieldId;
+  clientId?: ClientId; // Phase 6.5: Client-specific fields support (null = global field)
   fieldLabel: string;
   fieldType: FieldType;
   fieldOrder: number;
@@ -283,6 +284,7 @@ export interface DatabaseOutcome {
 
 export interface DatabaseCustomField {
   id: number;
+  client_id: number | null; // Phase 6.5: Client-specific fields support
   field_label: string;
   field_type: string;
   field_order: number;

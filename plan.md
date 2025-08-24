@@ -760,11 +760,111 @@ describe('DynamicField Component', () => {
 
 ---
 
-## Phase 7: Data Management & Reporting (Week 7)
+## Phase 6.5: Client-Specific Form Configuration (NEW)
+**📚 PRIMARY DOCUMENTATION**: [React Hook Form](./devdocs/react-hook-form.md) + [Zod](./devdocs/zod.md) + [shadcn/ui](./devdocs/shadcn-ui.md)
+
+### Objectives
+Transform the existing global custom fields system to support client-specific form customization, enabling admins to create custom form fields that appear only when specific clients are selected.
+
+### 🚨 MANDATORY Pre-Phase Steps
+1. **Review [React Hook Form Documentation](./devdocs/react-hook-form.md)** - Client-aware dynamic field patterns
+2. **Study [Zod Documentation](./devdocs/zod.md)** - Client-specific validation schema patterns
+3. **Check [shadcn/ui Documentation](./devdocs/shadcn-ui.md)** - Admin field builder components
+4. **Review [Express.js Documentation](./devdocs/express.md)** - Client-specific API endpoint patterns
+5. **Follow documented component enhancement patterns** rather than creating new implementations
+
+### Pre-Phase Test Specifications
+**📖 Follow client-specific field testing patterns from documentation:**
+
+#### E2E Tests (e2e-tests/client-specific-fields.spec.ts)
+**Copy client field testing patterns from React Testing Library documentation:**
+```typescript
+describe('Client-Specific Form Fields', () => {
+  test('admin sees "Add New Capture" button in Additional Information section')
+  test('admin can create custom dropdown for specific client')
+  test('custom fields appear only when associated client is selected')
+  test('different clients show different sets of custom fields')
+  test('default form shows only Additional Notes when no client selected')
+  test('form validation works with client-specific fields')
+})
+```
+
+#### API Tests (backend/tests/client-fields.test.ts)
+```typescript
+describe('Client Fields API', () => {
+  test('GET /api/clients/:id/fields - returns client-specific fields')
+  test('POST /api/clients/:id/fields - creates field for client')
+  test('PUT /api/clients/:id/fields/:fieldId - updates client field')
+  test('DELETE /api/clients/:id/fields/:fieldId - removes client field')
+  test('GET /api/form-config/:clientId - returns form configuration')
+})
+```
+
+#### Component Tests (frontend/tests/ClientFieldManager.test.tsx)
+```typescript
+describe('ClientFieldManager Component', () => {
+  test('renders Add New Capture button for admin users only')
+  test('opens field creation modal with client context')
+  test('saves field with client association')
+  test('loads and displays client-specific fields dynamically')
+})
+```
+
+### Database Schema Evolution
+**📖 Copy schema extension patterns from [SQLite Documentation](./devdocs/sqlite-better-sqlite3.md)**
+```sql
+-- Add client association to existing custom_fields table
+ALTER TABLE custom_fields ADD COLUMN client_id INTEGER REFERENCES clients(id);
+CREATE INDEX idx_custom_fields_client ON custom_fields(client_id);
+
+-- Migrate existing global fields to have NULL client_id (for backward compatibility)
+-- New client-specific fields will have specific client_id values
+```
+
+### UI Components
+**🚨 EXTEND EXISTING PATTERNS FROM DOCUMENTATION - DO NOT CREATE CUSTOM IMPLEMENTATIONS**
+
+1. **ClientFieldBuilder Component** → [shadcn/ui Documentation](./devdocs/shadcn-ui.md)
+   - Copy documented modal patterns for field creation
+   - Use documented form builder patterns with drag-and-drop
+   - Implement documented field type selection (dropdown, text, etc.)
+   - Follow documented choice management for dropdown fields
+
+2. **Enhanced ServiceLogForm** → [React Hook Form Documentation](./devdocs/react-hook-form.md)
+   - Modify existing form to watch client selection changes
+   - Load client-specific fields dynamically when client changes
+   - Show "Add New Capture" button for admin users only
+   - Render client fields in Additional Information section
+
+3. **Dynamic Field Loading** → [React 18 Documentation](./devdocs/react-18.md)
+   - Use documented performance patterns for lazy field loading
+   - Implement documented caching for client field configurations
+   - Follow documented state management for dynamic field changes
+
+### Key Technical Implementation
+**🚨 Each implementation MUST follow documented patterns:**
+
+1. **Database Migration** → Use documented migration patterns from [SQLite Documentation](./devdocs/sqlite-better-sqlite3.md)
+2. **API Endpoints** → Follow RESTful patterns from [Express.js Documentation](./devdocs/express.md)
+3. **Form Logic Updates** → Use documented React Hook Form patterns for dynamic field management
+4. **Validation Schemas** → Implement documented Zod patterns for client-aware validation
+5. **Admin Interface** → Copy documented admin component patterns from shadcn/ui
+
+### Success Criteria
+- Admin can create custom fields for specific clients
+- Fields appear only when associated client is selected
+- Default form shows only "Additional Notes" + "Add New Capture" (admin)
+- Form validation works seamlessly with client-specific fields
+- Backward compatibility maintained for existing functionality
+- Performance remains optimal with lazy loading patterns
+
+---
+
+## Phase 7: Enhanced Data Management & Client-Aware Reporting (Week 7)
 **📚 PRIMARY DOCUMENTATION**: [SQLite](./devdocs/sqlite-better-sqlite3.md) + [Express.js](./devdocs/express.md) + [React 18](./devdocs/react-18.md)
 
 ### Objectives
-Build comprehensive data viewing using documented query optimization patterns, export functionality, and performance patterns for large datasets.
+Build comprehensive data viewing using documented query optimization patterns, export functionality, and performance patterns for large datasets. **Enhanced to handle client-specific custom field data in reporting and exports.**
 
 ### 🚨 MANDATORY Pre-Phase Steps
 1. **Read [SQLite Documentation](./devdocs/sqlite-better-sqlite3.md)** - Query optimization, indexing, and reporting patterns
@@ -835,8 +935,8 @@ describe('Reporting API', () => {
 **🚨 Each deliverable MUST follow documented patterns:**
 1. **Submissions interface** → Copy data table patterns from [shadcn/ui Documentation](./devdocs/shadcn-ui.md) with performance optimization
 2. **Advanced filtering** → Use documented filter patterns from React Hook Form with Zod validation
-3. **Export functionality** → Follow documented export patterns from [Express.js Documentation](./devdocs/express.md) with streaming
-4. **Summary reports** → Copy documented query optimization patterns from [SQLite Documentation](./devdocs/sqlite-better-sqlite3.md)
+3. **Export functionality** → Follow documented export patterns from [Express.js Documentation](./devdocs/express.md) with streaming **and client-specific custom field data**
+4. **Summary reports** → Copy documented query optimization patterns from [SQLite Documentation](./devdocs/sqlite-better-sqlite3.md) **with client-aware field aggregation**
 5. **Analytics dashboard** → Use documented dashboard layout patterns from shadcn/ui
 6. **Saved searches** → Implement documented persistence patterns from React 18 with proper TypeScript typing
 
