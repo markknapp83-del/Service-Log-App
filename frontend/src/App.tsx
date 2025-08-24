@@ -5,6 +5,7 @@ import { ToastProvider } from './hooks/useToast';
 import { ProtectedRoute } from './components/ProtectedRoute';
 import { LoginPage } from './pages/LoginPage';
 import { DashboardPage } from './pages/DashboardPage';
+import { ServiceLogPage } from './pages/ServiceLogPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Toast } from './components/Toast';
 
@@ -24,6 +25,16 @@ function App() {
               element={
                 <ProtectedRoute>
                   <DashboardPage />
+                </ProtectedRoute>
+              }
+            />
+            
+            {/* Service Log Entry */}
+            <Route
+              path="/service-log"
+              element={
+                <ProtectedRoute>
+                  <ServiceLogPage />
                 </ProtectedRoute>
               }
             />

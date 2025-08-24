@@ -3,10 +3,12 @@ import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/useToast';
 import { Button } from '@/components/Button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/Card';
+import { useNavigate } from 'react-router-dom';
 
 export function DashboardPage() {
   const { user, logout, isLoading } = useAuth();
   const { showToast } = useToast();
+  const navigate = useNavigate();
 
   const handleLogout = async () => {
     try {
@@ -113,10 +115,14 @@ export function DashboardPage() {
               <CardContent>
                 <div className="text-center py-4">
                   <p className="text-gray-500 mb-4">
-                    Service log functionality will be implemented in Phase 3
+                    Phase 3: Service Log Form is now ready! ✅
                   </p>
-                  <Button variant="outline" disabled>
-                    Create Service Log
+                  <Button 
+                    variant="primary" 
+                    onClick={() => navigate('/service-log')}
+                    className="w-full"
+                  >
+                    Create Service Log Entry
                   </Button>
                 </div>
               </CardContent>
@@ -165,8 +171,8 @@ export function DashboardPage() {
                     <span className="text-sm">Authentication System</span>
                   </div>
                   <div className="flex items-center">
-                    <div className="w-3 h-3 bg-gray-300 rounded-full mr-3"></div>
-                    <span className="text-sm text-gray-500">Service Logging (Phase 3)</span>
+                    <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                    <span className="text-sm">Service Logging (Phase 3) ✅</span>
                   </div>
                   <div className="flex items-center">
                     <div className="w-3 h-3 bg-gray-300 rounded-full mr-3"></div>

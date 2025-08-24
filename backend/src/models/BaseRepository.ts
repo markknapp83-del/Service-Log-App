@@ -268,18 +268,18 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
   }
 
   // Count records with optional filtering
-  async count(where?: string, params?: any[]): Promise<number> {
+  count(where?: string, params?: any[]): number {
     try {
-      let whereClause = `(deleted_at IS NULL OR deleted_at = '')`;
+      let whereClause = `is_active = 1`;
       if (where) {
         whereClause += ` AND (${where})`;
       }
 
-      const stmt = await this.db.prepare(`
+      const stmt = this.db.prepare(`
         SELECT COUNT(*) as total FROM ${this.tableName} WHERE ${whereClause}
       `);
 
-      const result = await stmt.get(...(params || [])) as { total: number };
+      const result = stmt.get(...(params || [])) as { total: number };
       return result.total;
     } catch (error) {
       logger.error(`Failed to count ${this.tableName}`, { where, params, error });

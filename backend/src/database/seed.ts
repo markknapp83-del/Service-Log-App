@@ -17,12 +17,12 @@ export async function seedDatabase(): Promise<void> {
   try {
     // Create default admin user
     let adminUser;
-    const existingAdmin = await userRepo.findByEmail('admin@healthcare.local');
+    const existingAdmin = userRepo.findByEmail('admin@healthcare.local');
     
     if (!existingAdmin) {
       const hashedPassword = await bcrypt.hash('admin123', 12);
       
-      adminUser = await userRepo.create({
+      adminUser = userRepo.create({
         username: 'admin',
         email: 'admin@healthcare.local',
         passwordHash: hashedPassword,
@@ -40,12 +40,12 @@ export async function seedDatabase(): Promise<void> {
 
     // Create default candidate user for testing
     let candidateUser;
-    const existingCandidate = await userRepo.findByEmail('candidate@healthcare.local');
+    const existingCandidate = userRepo.findByEmail('candidate@healthcare.local');
     
     if (!existingCandidate) {
       const hashedPassword = await bcrypt.hash('candidate123', 12);
       
-      candidateUser = await userRepo.create({
+      candidateUser = userRepo.create({
         username: 'candidate',
         email: 'candidate@healthcare.local',
         passwordHash: hashedPassword,
@@ -61,6 +61,29 @@ export async function seedDatabase(): Promise<void> {
       candidateUser = existingCandidate;
     }
 
+    // Create test user with the credentials requested
+    let testUser;
+    const existingTestUser = userRepo.findByEmail('test@test.com');
+    
+    if (!existingTestUser) {
+      const hashedPassword = await bcrypt.hash('password123', 12);
+      
+      testUser = userRepo.create({
+        username: 'testuser',
+        email: 'test@test.com',
+        passwordHash: hashedPassword,
+        role: 'candidate',
+        firstName: 'Test',
+        lastName: 'User',
+        isActive: true,
+        lastLoginAt: undefined
+      });
+      
+      logger.info('Test user created', { email: 'test@test.com' });
+    } else {
+      testUser = existingTestUser;
+    }
+
     // Seed Clients/Sites - Healthcare facilities
     const defaultClients = [
       { name: 'Main Hospital', isActive: true },
@@ -73,7 +96,7 @@ export async function seedDatabase(): Promise<void> {
 
     for (const clientData of defaultClients) {
       try {
-        await clientRepo.createClient(clientData, adminUser.id);
+        clientRepo.createClient(clientData, adminUser.id);
       } catch (error) {
         // Skip if already exists
         if (!error.message.includes('already exists')) {
@@ -99,7 +122,7 @@ export async function seedDatabase(): Promise<void> {
 
     for (const activityData of defaultActivities) {
       try {
-        await activityRepo.createActivity(activityData, adminUser.id);
+        activityRepo.createActivity(activityData, adminUser.id);
       } catch (error) {
         // Skip if already exists
         if (!error.message.includes('already exists')) {
@@ -127,7 +150,7 @@ export async function seedDatabase(): Promise<void> {
 
     for (const outcomeData of defaultOutcomes) {
       try {
-        await outcomeRepo.createOutcome(outcomeData, adminUser.id);
+        outcomeRepo.createOutcome(outcomeData, adminUser.id);
       } catch (error) {
         // Skip if already exists
         if (!error.message.includes('already exists')) {
@@ -138,12 +161,12 @@ export async function seedDatabase(): Promise<void> {
     logger.info('Default outcomes seeded');
 
     // Log seeded data counts
-    const clientCount = await clientRepo.count();
-    const activityCount = await activityRepo.count();
-    const outcomeCount = await outcomeRepo.count();
+    const clientCount = clientRepo.count();
+    const activityCount = activityRepo.count();
+    const outcomeCount = outcomeRepo.count();
 
     logger.info('Database seeding completed successfully', {
-      users: 2,
+      users: 3,
       clients: clientCount,
       activities: activityCount,
       outcomes: outcomeCount

@@ -73,12 +73,12 @@ export class ClientRepository extends BaseRepository<Client, DatabaseClient, Cli
   }
 
   // Check if client name already exists
-  async isNameTaken(name: string, excludeId?: ClientId): Promise<boolean> {
+  isNameTaken(name: string, excludeId?: ClientId): boolean {
     try {
       let query = `
         SELECT COUNT(*) as count FROM ${this.tableName}
         WHERE LOWER(name) = LOWER(?) 
-        AND (deleted_at IS NULL OR deleted_at = '')
+        AND is_active = 1
       `;
       const params: any[] = [name];
 
@@ -87,8 +87,8 @@ export class ClientRepository extends BaseRepository<Client, DatabaseClient, Cli
         params.push(excludeId);
       }
 
-      const stmt = await this.db.prepare(query);
-      const result = await stmt.get(...params) as { count: number };
+      const stmt = this.db.prepare(query);
+      const result = stmt.get(...params) as { count: number };
       
       return result.count > 0;
     } catch (error) {
@@ -97,14 +97,14 @@ export class ClientRepository extends BaseRepository<Client, DatabaseClient, Cli
   }
 
   // Create client with name uniqueness validation
-  async createClient(data: ClientCreateRequest, userId: string): Promise<Client> {
+  createClient(data: ClientCreateRequest, userId: string): Client {
     // Validate name uniqueness
-    const nameExists = await this.isNameTaken(data.name);
+    const nameExists = this.isNameTaken(data.name);
     if (nameExists) {
       throw new Error(`Client name '${data.name}' already exists`);
     }
 
-    return await this.create(data, userId);
+    return this.create(data, userId);
   }
 
   // Update client with name uniqueness validation

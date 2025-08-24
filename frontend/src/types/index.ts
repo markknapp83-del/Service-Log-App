@@ -112,3 +112,96 @@ export interface ErrorFallbackProps {
   error: Error;
   resetError: () => void;
 }
+
+// Service Log Domain Types - Following healthcare patterns from Zod documentation
+export type ServiceLogId = string;
+export type ClientId = string;
+export type ActivityId = string;
+export type OutcomeId = string;
+
+export interface Client {
+  readonly id: ClientId;
+  name: string;
+  isActive: boolean;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export interface Activity {
+  readonly id: ActivityId;
+  name: string;
+  isActive: boolean;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export interface Outcome {
+  readonly id: OutcomeId;
+  name: string;
+  isActive: boolean;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+}
+
+export interface PatientEntry {
+  readonly id?: string;
+  serviceLogId?: ServiceLogId;
+  newPatients: number;
+  followupPatients: number;
+  dnaCount: number; // Did Not Attend
+  outcomeId: OutcomeId;
+}
+
+export interface ServiceLog {
+  readonly id: ServiceLogId;
+  userId: UserId;
+  clientId: ClientId;
+  activityId: ActivityId;
+  patientCount: number;
+  isDraft: boolean;
+  submittedAt?: ISODateString;
+  createdAt: ISODateString;
+  updatedAt: ISODateString;
+  patientEntries: PatientEntry[];
+}
+
+// Service Log Form Types - Following React Hook Form documentation patterns
+export interface ServiceLogFormData {
+  clientId: string;
+  activityId: string;
+  patientCount: number;
+  patientEntries: PatientEntry[];
+}
+
+export interface ServiceLogFormProps {
+  onSubmit: (data: ServiceLogFormData) => Promise<void>;
+  onCancel?: () => void;
+  initialData?: Partial<ServiceLogFormData>;
+  isLoading?: boolean;
+}
+
+// Custom Field Types - For Phase 6 dynamic fields
+export interface CustomField {
+  readonly id: string;
+  fieldLabel: string;
+  fieldType: 'dropdown' | 'text' | 'number';
+  fieldOrder: number;
+  isActive: boolean;
+  choices?: CustomFieldChoice[];
+}
+
+export interface CustomFieldChoice {
+  readonly id: string;
+  fieldId: string;
+  choiceText: string;
+  choiceOrder: number;
+}
+
+export interface CustomFieldValue {
+  readonly id?: string;
+  patientEntryId: string;
+  fieldId: string;
+  choiceId?: string;
+  textValue?: string;
+  numberValue?: number;
+}

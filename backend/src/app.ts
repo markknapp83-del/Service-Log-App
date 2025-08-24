@@ -14,8 +14,8 @@ async function createApp() {
   // Initialize database schema
   await initializeSchema();
   
-  // Temporarily disabled seeding to test connection
-  // const { seedDatabase } = await import('@/database/seed.js');
+  // Temporarily disable seeding to test basic functionality
+  // const { seedDatabase } = await import('@/database/seed');
   // await seedDatabase();
 
   // Security middleware
@@ -66,7 +66,8 @@ async function createApp() {
   });
 
   // Import routes
-  const authRoutes = await import('@/routes/auth.js');
+  const authRoutes = await import('@/routes/auth');
+  // const serviceLogRoutes = await import('@/routes/serviceLogSimple');
 
   // Rate limiting for authentication endpoints
   const authLimiter = rateLimit({
@@ -83,6 +84,45 @@ async function createApp() {
 
   // API routes
   app.use('/api/auth', authLimiter, authRoutes.default);
+  
+  // Temporary mock service log endpoints for demo
+  app.get('/api/service-logs/options', (req, res) => {
+    res.json({
+      success: true,
+      data: {
+        clients: [
+          { id: '1', name: 'Downtown Clinic', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+          { id: '2', name: 'Community Health Center', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+          { id: '3', name: 'Regional Hospital', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+        ],
+        activities: [
+          { id: '1', name: 'General Consultation', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+          { id: '2', name: 'Physiotherapy', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+          { id: '3', name: 'Mental Health Counseling', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+        ],
+        outcomes: [
+          { id: '1', name: 'Treatment Completed', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+          { id: '2', name: 'Referred to Specialist', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
+          { id: '3', name: 'Follow-up Required', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
+        ]
+      },
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  app.post('/api/service-logs', (req, res) => {
+    console.log('Service log submission received:', JSON.stringify(req.body, null, 2));
+    res.json({
+      success: true,
+      data: {
+        id: 'service-log-' + Date.now(),
+        ...req.body,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      timestamp: new Date().toISOString()
+    });
+  });
 
   // 404 handler for undefined routes
   app.use('*', (req, res) => {
