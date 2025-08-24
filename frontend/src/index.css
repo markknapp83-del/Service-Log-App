@@ -1,0 +1,52 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Healthcare-specific CSS variables following Tailwind documentation */
+:root {
+  --healthcare-primary: #2563eb;
+  --healthcare-secondary: #64748b;
+  --healthcare-accent: #10b981;
+  --healthcare-error: #ef4444;
+  --healthcare-warning: #f59e0b;
+  --healthcare-success: #10b981;
+  --healthcare-background: #f8fafc;
+  --healthcare-surface: #ffffff;
+  --healthcare-text-primary: #1e293b;
+  --healthcare-text-secondary: #64748b;
+}
+
+/* Base styles following shadcn/ui patterns */
+@layer base {
+  * {
+    @apply border-border;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Component styles */
+@layer components {
+  .btn-primary {
+    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors;
+  }
+  
+  .btn-secondary {
+    @apply bg-gray-100 hover:bg-gray-200 text-gray-900 font-medium py-2 px-4 rounded-lg transition-colors;
+  }
+  
+  .input-field {
+    @apply block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+  }
+  
+  .form-error {
+    @apply text-red-600 text-sm mt-1;
+  }
+  
+  .card {
+    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6;
+  }
+}
