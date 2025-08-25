@@ -38,7 +38,7 @@ export class ActivityRepository extends BaseRepository<Activity, DatabaseActivit
   }
 
   // Find activities by name (case-insensitive search)
-  async findByName(name: string): Promise<Activity[]> {
+  findByName(name: string): Activity[] {
     try {
       const stmt = this.db.prepare(`
         SELECT * FROM ${this.tableName}
@@ -55,7 +55,7 @@ export class ActivityRepository extends BaseRepository<Activity, DatabaseActivit
   }
 
   // Get all active activities
-  async findActive(): Promise<Activity[]> {
+  findActive(): Activity[] {
     try {
       const stmt = this.db.prepare(`
         SELECT * FROM ${this.tableName}
@@ -101,7 +101,7 @@ export class ActivityRepository extends BaseRepository<Activity, DatabaseActivit
       throw new Error(`Activity name '${data.name}' already exists`);
     }
 
-    return this.create(data, userId);
+    return this.createWithAutoIncrement(data, userId);
   }
 
   // Update activity with name uniqueness validation
@@ -156,8 +156,13 @@ export class ActivityRepository extends BaseRepository<Activity, DatabaseActivit
     }
   }
 
+  // Delete activity (soft delete)
+  delete(id: ActivityId, userId: string): boolean {
+    return this.softDelete(id, userId);
+  }
+
   // Bulk create activities
-  async bulkCreateActivities(activities: ActivityCreateRequest[], userId: string): Promise<Activity[]> {
+  bulkCreateActivities(activities: ActivityCreateRequest[], userId: string): Activity[] {
     // Validate all names are unique
     const names = activities.map(a => a.name.toLowerCase());
     const uniqueNames = new Set(names);

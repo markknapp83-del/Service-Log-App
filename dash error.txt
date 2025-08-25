@@ -1,0 +1,4 @@
+SubmissionsPage.tsx:214 Failed to load submissions: Error: HTTP error! status: 500
+    at SubmissionsService.fetchWithAuth (SubmissionsPage.tsx:27:13)
+    at async SubmissionsPage.tsx:204:24
+    at async loadInitialData (SubmissionsPage.tsx:188:9)

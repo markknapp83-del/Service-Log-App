@@ -57,6 +57,47 @@ export class PatientEntryRepository extends BaseRepository<PatientEntry, Databas
     });
   }
 
+  // Find patient entries by service log ID (simple array result)
+  async findByServiceLogId(serviceLogId: ServiceLogId): Promise<PatientEntry[]> {
+    try {
+      const stmt = await this.db.prepare(`
+        SELECT * FROM ${this.tableName}
+        WHERE service_log_id = ?
+        AND (deleted_at IS NULL OR deleted_at = '')
+        ORDER BY created_at ASC
+      `);
+
+      const rows = await stmt.all(serviceLogId) as DatabasePatientEntry[];
+      return rows.map(row => this.fromDatabase(row));
+    } catch (error) {
+      throw new Error(`Failed to find patient entries by service log ID: ${error}`);
+    }
+  }
+
+  // Batch find patient entries by multiple service log IDs - optimized for exports
+  async findByServiceLogIds(serviceLogIds: ServiceLogId[]): Promise<PatientEntry[]> {
+    if (serviceLogIds.length === 0) {
+      return [];
+    }
+
+    try {
+      // Create placeholders for IN clause
+      const placeholders = serviceLogIds.map(() => '?').join(', ');
+      
+      const stmt = await this.db.prepare(`
+        SELECT * FROM ${this.tableName}
+        WHERE service_log_id IN (${placeholders})
+        AND (deleted_at IS NULL OR deleted_at = '')
+        ORDER BY service_log_id, created_at ASC
+      `);
+
+      const rows = await stmt.all(...serviceLogIds) as DatabasePatientEntry[];
+      return rows.map(row => this.fromDatabase(row));
+    } catch (error) {
+      throw new Error(`Failed to find patient entries by service log IDs: ${error}`);
+    }
+  }
+
   // Find patient entries by outcome
   async findByOutcome(
     outcomeId: OutcomeId,
@@ -192,22 +233,54 @@ export class PatientEntryRepository extends BaseRepository<PatientEntry, Databas
     }
   }
 
-  // Delete all patient entries for a service log
+  // Delete all patient entries for a service log - optimized batch delete
   async deleteByServiceLog(serviceLogId: ServiceLogId, userId: UserId): Promise<number> {
     try {
-      const entries = await this.findByServiceLog(serviceLogId);
-      let deleteCount = 0;
+      const now = new Date().toISOString();
+      
+      // Use single batch update for better performance
+      const stmt = await this.db.prepare(`
+        UPDATE ${this.tableName}
+        SET deleted_at = ?, updated_at = ?
+        WHERE service_log_id = ?
+        AND (deleted_at IS NULL OR deleted_at = '')
+      `);
 
-      await this.db.transaction(async () => {
-        for (const entry of entries.items) {
-          await this.softDelete(entry.id, userId);
-          deleteCount++;
-        }
+      const result = await this.db.transaction(async () => {
+        const updateResult = await stmt.run(now, now, serviceLogId);
+        
+        // Log audit entry for bulk delete
+        await this.logAudit(serviceLogId, 'DELETE', 
+          { serviceLogId }, 
+          { serviceLogId, deletedAt: now, deletedCount: updateResult.changes }, 
+          userId
+        );
+        
+        return updateResult.changes || 0;
       })();
 
-      return deleteCount;
+      return result;
     } catch (error) {
       throw new Error(`Failed to delete patient entries for service log: ${error}`);
+    }
+  }
+
+  // Optimized delete by service log ID with userId handling
+  async deleteByServiceLogId(serviceLogId: ServiceLogId): Promise<number> {
+    try {
+      const now = new Date().toISOString();
+      
+      const stmt = await this.db.prepare(`
+        UPDATE ${this.tableName}
+        SET deleted_at = ?, updated_at = ?
+        WHERE service_log_id = ?
+        AND (deleted_at IS NULL OR deleted_at = '')
+      `);
+
+      const result = await stmt.run(now, now, serviceLogId);
+      return result.changes || 0;
+    } catch (error) {
+      throw new Error(`Failed to delete patient entries by service log ID: ${error}`);
     }
   }
 

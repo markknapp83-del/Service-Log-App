@@ -113,10 +113,7 @@ export function DashboardPage() {
                 </CardDescription>
               </CardHeader>
               <CardContent>
-                <div className="text-center py-4">
-                  <p className="text-gray-500 mb-4">
-                    Phase 3: Service Log Form is now ready! ✅
-                  </p>
+                <div className="space-y-3">
                   <Button 
                     variant="primary" 
                     onClick={() => navigate('/service-log')}
@@ -124,6 +121,16 @@ export function DashboardPage() {
                   >
                     Create Service Log Entry
                   </Button>
+                  <Button 
+                    variant="outline" 
+                    onClick={() => navigate('/submissions')}
+                    className="w-full"
+                  >
+                    View Submissions & Reports
+                  </Button>
+                  <p className="text-xs text-gray-500 text-center">
+                    ✅ Service logging and reporting ready!
+                  </p>
                 </div>
               </CardContent>
             </Card>
@@ -147,15 +154,25 @@ export function DashboardPage() {
                     >
                       User Management
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full" disabled>
-                      System Settings
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full"
+                      onClick={() => navigate('/admin/templates')}
+                    >
+                      Template Management
                     </Button>
-                    <Button variant="outline" size="sm" className="w-full" disabled>
-                      Reports
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full"
+                      onClick={() => navigate('/submissions')}
+                    >
+                      View All Submissions
                     </Button>
                   </div>
                   <p className="text-xs text-gray-500 mt-3">
-                    ✅ User Management ready! Other features coming in Phase 5-7
+                    ✅ Admin features ready! Phase 7 reporting complete.
                   </p>
                 </CardContent>
               </Card>
@@ -166,7 +183,7 @@ export function DashboardPage() {
               <CardHeader>
                 <CardTitle>System Status</CardTitle>
                 <CardDescription>
-                  Phases 1-4 Complete ✅
+                  Phase 7 Complete - Data Management & Reporting ✅
                 </CardDescription>
               </CardHeader>
               <CardContent>
@@ -184,12 +201,16 @@ export function DashboardPage() {
                     <span className="text-sm">User Management (Phase 4) ✅</span>
                   </div>
                   <div className="flex items-center">
-                    <div className="w-3 h-3 bg-gray-300 rounded-full mr-3"></div>
-                    <span className="text-sm text-gray-500">Template Management (Phase 5)</span>
+                    <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                    <span className="text-sm">Template Management (Phase 5) ✅</span>
                   </div>
                   <div className="flex items-center">
-                    <div className="w-3 h-3 bg-gray-300 rounded-full mr-3"></div>
-                    <span className="text-sm text-gray-500">Dynamic Fields (Phase 6)</span>
+                    <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                    <span className="text-sm">Client Fields (Phase 6.5) ✅</span>
+                  </div>
+                  <div className="flex items-center">
+                    <div className="w-3 h-3 bg-green-500 rounded-full mr-3"></div>
+                    <span className="text-sm">Data Management & Reports (Phase 7) ✅</span>
                   </div>
                 </div>
               </CardContent>

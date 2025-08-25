@@ -19,7 +19,27 @@ export const errorHandler = (
     statusCode = error.statusCode;
     message = error.message;
     details = error.details || {};
-    code = error.name.replace('Error', '').toUpperCase();
+    
+    // Map error names to expected codes
+    switch (error.name) {
+      case 'AuthenticationError':
+        code = 'AUTHENTICATION_ERROR';
+        break;
+      case 'AuthorizationError':
+        code = 'FORBIDDEN';
+        break;
+      case 'ValidationError':
+        code = 'VALIDATION_ERROR';
+        break;
+      case 'NotFoundError':
+        code = 'NOT_FOUND';
+        break;
+      case 'ConflictError':
+        code = 'CONFLICT';
+        break;
+      default:
+        code = error.name.replace('Error', '').toUpperCase();
+    }
   } else if (error.name === 'ValidationError') {
     statusCode = 400;
     message = 'Validation error';

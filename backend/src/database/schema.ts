@@ -72,6 +72,7 @@ export function createTables(): void {
       submitted_at TEXT,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      deleted_at TEXT,
       FOREIGN KEY (user_id) REFERENCES users(id),
       FOREIGN KEY (client_id) REFERENCES clients(id),
       FOREIGN KEY (activity_id) REFERENCES activities(id)
@@ -87,60 +88,15 @@ export function createTables(): void {
       outcome_id INTEGER NOT NULL,
       created_at TEXT NOT NULL DEFAULT (datetime('now')),
       updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+      deleted_at TEXT,
       FOREIGN KEY (service_log_id) REFERENCES service_logs(id) ON DELETE CASCADE,
       FOREIGN KEY (outcome_id) REFERENCES outcomes(id)
     )
   `);
 
-  try {
-    // Custom Fields table - for dynamic form fields (client-specific support)
-    db.exec(`
-      CREATE TABLE IF NOT EXISTS custom_fields (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        client_id INTEGER,
-        field_label TEXT NOT NULL,
-        field_type TEXT DEFAULT 'dropdown' CHECK (field_type IN ('dropdown', 'text', 'number', 'checkbox')),
-        field_order INTEGER,
-        is_active INTEGER DEFAULT 1,
-        created_at TEXT NOT NULL DEFAULT (datetime('now')),
-        updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-        FOREIGN KEY (client_id) REFERENCES clients(id)
-      )
-    `);
-    logger.info('✓ Custom Fields table with client_id created');
-  } catch (error) {
-    logger.error('❌ Failed to create custom_fields table', { error });
-    throw error;
-  }
-
-  // Custom Field Choices table - for dropdown options
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS field_choices (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      field_id INTEGER NOT NULL,
-      choice_text TEXT NOT NULL,
-      choice_order INTEGER,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (field_id) REFERENCES custom_fields(id) ON DELETE CASCADE
-    )
-  `);
-
-  // Custom Field Values table - stores dynamic field values
-  db.exec(`
-    CREATE TABLE IF NOT EXISTS custom_field_values (
-      id TEXT PRIMARY KEY,
-      patient_entry_id TEXT NOT NULL,
-      field_id INTEGER NOT NULL,
-      choice_id INTEGER,
-      text_value TEXT,
-      number_value REAL,
-      checkbox_value INTEGER,
-      created_at TEXT NOT NULL DEFAULT (datetime('now')),
-      FOREIGN KEY (patient_entry_id) REFERENCES patient_entries(id) ON DELETE CASCADE,
-      FOREIGN KEY (field_id) REFERENCES custom_fields(id),
-      FOREIGN KEY (choice_id) REFERENCES field_choices(id)
-    )
-  `);
+  // Note: Custom field tables removed in Phase 7.1 cleanup
+  // These tables (custom_fields, field_choices, custom_field_values) were causing
+  // performance issues and were disabled in Phase 6.6. Removed to improve client selection performance.
 
   // Audit log for tracking changes - following documented audit patterns
   db.exec(`
@@ -157,57 +113,81 @@ export function createTables(): void {
     )
   `);
 
+  // Enable WAL mode and optimize SQLite settings for performance
+  try {
+    db.pragma('journal_mode = WAL');
+    db.pragma('synchronous = NORMAL');
+    db.pragma('cache_size = -64000'); // 64MB cache
+    db.pragma('temp_store = memory');
+    db.pragma('mmap_size = 268435456'); // 256MB mmap
+    db.pragma('optimize');
+    logger.info('✓ SQLite performance settings applied');
+  } catch (error) {
+    logger.warn('⚠️ Could not apply all SQLite performance settings', { error });
+  }
+
   createIndexes();
   logger.info('Database tables created successfully');
 }
 
 function createIndexes(): void {
-  // Create indexes for performance - following documented optimization patterns
+  logger.info('Creating performance indexes');
   
-  // User indexes
+  // User indexes - authentication performance
   db.exec(`CREATE INDEX IF NOT EXISTS idx_users_email ON users (email)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_users_username ON users (username)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_users_created_at ON users (created_at)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_users_is_active ON users (is_active)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_users_role_active ON users (role, is_active)`);
   
-  // Service log indexes - critical for performance
+  // Service log indexes - critical for reporting performance
   db.exec(`CREATE INDEX IF NOT EXISTS idx_service_logs_user ON service_logs (user_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_service_logs_client ON service_logs (client_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_service_logs_activity ON service_logs (activity_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_service_logs_created_at ON service_logs (created_at)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_service_logs_submitted_at ON service_logs (submitted_at)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_service_logs_is_draft ON service_logs (is_draft)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_service_logs_service_date ON service_logs (service_date)`);
   
-  // Patient entries indexes
+  // Composite indexes for common query patterns
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_service_logs_user_draft ON service_logs (user_id, is_draft)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_service_logs_user_date ON service_logs (user_id, service_date)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_service_logs_client_date ON service_logs (client_id, service_date)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_service_logs_activity_date ON service_logs (activity_id, service_date)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_service_logs_date_range ON service_logs (service_date, created_at)`);
+  
+  // Patient entries indexes - critical for export performance
   db.exec(`CREATE INDEX IF NOT EXISTS idx_patient_entries_service_log ON patient_entries (service_log_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_patient_entries_outcome ON patient_entries (outcome_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_patient_entries_appointment_type ON patient_entries (appointment_type)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_patient_entries_service_log_created ON patient_entries (service_log_id, created_at)`);
   
-  // Custom field indexes
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_custom_fields_active ON custom_fields (is_active, field_order)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_custom_fields_client ON custom_fields (client_id)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_custom_fields_client_active ON custom_fields (client_id, is_active, field_order)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_field_choices_field ON field_choices (field_id, choice_order)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_custom_field_values_entry ON custom_field_values (patient_entry_id)`);
-  db.exec(`CREATE INDEX IF NOT EXISTS idx_custom_field_values_field ON custom_field_values (field_id)`);
+  // Note: Custom field indexes removed in Phase 7.1 cleanup
+  // 7 indexes removed to improve performance and eliminate unused infrastructure
   
-  // Reference data indexes
+  // Reference data indexes - lookup performance
   db.exec(`CREATE INDEX IF NOT EXISTS idx_clients_active ON clients (is_active)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_clients_name ON clients (name)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_activities_active ON activities (is_active)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_activities_name ON activities (name)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_outcomes_active ON outcomes (is_active)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_outcomes_name ON outcomes (name)`);
   
-  // Audit log indexes
+  // Audit log indexes - monitoring and compliance
   db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_table_record ON audit_log (table_name, record_id)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_timestamp ON audit_log (timestamp)`);
   db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_user ON audit_log (user_id)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_action ON audit_log (action)`);
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_audit_user_timestamp ON audit_log (user_id, timestamp)`);
+  
+  logger.info('Performance indexes created successfully');
 }
 
 export function dropTables(): void {
   logger.info('Dropping database tables');
   
   // Drop in reverse order to respect foreign key constraints
-  db.exec(`DROP TABLE IF EXISTS custom_field_values`);
-  db.exec(`DROP TABLE IF EXISTS field_choices`);
-  db.exec(`DROP TABLE IF EXISTS custom_fields`);
+  // Note: Custom field tables removed in Phase 7.1 - no longer exist
   db.exec(`DROP TABLE IF EXISTS patient_entries`);
   db.exec(`DROP TABLE IF EXISTS service_logs`);
   db.exec(`DROP TABLE IF EXISTS outcomes`);

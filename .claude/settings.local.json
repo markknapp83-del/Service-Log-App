@@ -36,7 +36,15 @@
       "Read(/c:\\Users\\Mark\\Projects\\service-log-simple/**)",
       "Read(/c:\\Users\\Mark\\Projects\\service-log-simple/**)",
       "Bash(rm:*)",
-      "Read(/c:\\Users\\Mark\\Projects\\service-log-simple/**)"
+      "Read(/c:\\Users\\Mark\\Projects\\service-log-simple/**)",
+      "Bash(grep:*)",
+      "Bash(PORT=5001 npm run dev)",
+      "Bash(PORT=5002 npm run dev)",
+      "Read(/c:\\Users\\Mark\\Projects\\service-log-simple/**)",
+      "Bash(del healthcare.db)",
+      "Bash(powershell:*)",
+      "Bash(npx tsx:*)",
+      "Bash(sqlite3:*)"
     ],
     "deny": [],
     "ask": [],

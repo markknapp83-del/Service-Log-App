@@ -38,7 +38,7 @@ export class OutcomeRepository extends BaseRepository<Outcome, DatabaseOutcome, 
   }
 
   // Find outcomes by name (case-insensitive search)
-  async findByName(name: string): Promise<Outcome[]> {
+  findByName(name: string): Outcome[] {
     try {
       const stmt = this.db.prepare(`
         SELECT * FROM ${this.tableName}
@@ -55,7 +55,7 @@ export class OutcomeRepository extends BaseRepository<Outcome, DatabaseOutcome, 
   }
 
   // Get all active outcomes
-  async findActive(): Promise<Outcome[]> {
+  findActive(): Outcome[] {
     try {
       const stmt = this.db.prepare(`
         SELECT * FROM ${this.tableName}
@@ -101,7 +101,7 @@ export class OutcomeRepository extends BaseRepository<Outcome, DatabaseOutcome, 
       throw new Error(`Outcome name '${data.name}' already exists`);
     }
 
-    return this.create(data, userId);
+    return this.createWithAutoIncrement(data, userId);
   }
 
   // Update outcome with name uniqueness validation
@@ -156,8 +156,13 @@ export class OutcomeRepository extends BaseRepository<Outcome, DatabaseOutcome, 
     }
   }
 
+  // Delete outcome (soft delete)
+  delete(id: OutcomeId, userId: string): boolean {
+    return this.softDelete(id, userId);
+  }
+
   // Bulk create outcomes
-  async bulkCreateOutcomes(outcomes: OutcomeCreateRequest[], userId: string): Promise<Outcome[]> {
+  bulkCreateOutcomes(outcomes: OutcomeCreateRequest[], userId: string): Outcome[] {
     // Validate all names are unique
     const names = outcomes.map(o => o.name.toLowerCase());
     const uniqueNames = new Set(names);

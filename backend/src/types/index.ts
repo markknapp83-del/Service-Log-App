@@ -148,8 +148,6 @@ export type PatientEntryId = string;
 export type ClientId = number;
 export type ActivityId = number;
 export type OutcomeId = number;
-export type CustomFieldId = number;
-export type FieldChoiceId = number;
 
 // Healthcare domain interfaces
 export interface Client {
@@ -202,38 +200,6 @@ export interface PatientEntry {
   updatedAt: ISODateString;
 }
 
-// Dynamic field system
-export type FieldType = 'dropdown' | 'text' | 'number' | 'checkbox';
-
-export interface CustomField {
-  readonly id: CustomFieldId;
-  clientId?: ClientId; // Phase 6.5: Client-specific fields support (null = global field)
-  fieldLabel: string;
-  fieldType: FieldType;
-  fieldOrder: number;
-  isActive: boolean;
-  createdAt: ISODateString;
-  updatedAt: ISODateString;
-}
-
-export interface FieldChoice {
-  readonly id: FieldChoiceId;
-  fieldId: CustomFieldId;
-  choiceText: string;
-  choiceOrder: number;
-  createdAt: ISODateString;
-}
-
-export interface CustomFieldValue {
-  readonly id: string;
-  patientEntryId: PatientEntryId;
-  fieldId: CustomFieldId;
-  choiceId?: FieldChoiceId;
-  textValue?: string;
-  numberValue?: number;
-  checkboxValue?: boolean;
-  createdAt: ISODateString;
-}
 
 // Database row types (following documented patterns)
 export interface DatabaseServiceLog {
@@ -282,35 +248,6 @@ export interface DatabaseOutcome {
   updated_at: string;
 }
 
-export interface DatabaseCustomField {
-  id: number;
-  client_id: number | null; // Phase 6.5: Client-specific fields support
-  field_label: string;
-  field_type: string;
-  field_order: number;
-  is_active: number;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface DatabaseFieldChoice {
-  id: number;
-  field_id: number;
-  choice_text: string;
-  choice_order: number;
-  created_at: string;
-}
-
-export interface DatabaseCustomFieldValue {
-  id: string;
-  patient_entry_id: string;
-  field_id: number;
-  choice_id: number | null;
-  text_value: string | null;
-  number_value: number | null;
-  checkbox_value: number | null;
-  created_at: string;
-}
 
 // Request/Response types for API
 export type ServiceLogCreateRequest = Omit<ServiceLog, 'id' | 'createdAt' | 'updatedAt' | 'submittedAt'> & {
@@ -323,9 +260,6 @@ export type ClientCreateRequest = Omit<Client, 'id' | 'createdAt' | 'updatedAt'>
 export type ActivityCreateRequest = Omit<Activity, 'id' | 'createdAt' | 'updatedAt'>;
 export type OutcomeCreateRequest = Omit<Outcome, 'id' | 'createdAt' | 'updatedAt'>;
 
-export type CustomFieldCreateRequest = Omit<CustomField, 'id' | 'createdAt' | 'updatedAt'> & {
-  choices?: Array<Omit<FieldChoice, 'id' | 'fieldId' | 'createdAt'>>;
-};
 
 // Extended service log with related data
 export interface ServiceLogWithDetails extends ServiceLog {
@@ -334,7 +268,6 @@ export interface ServiceLogWithDetails extends ServiceLog {
   user?: Pick<User, 'id' | 'firstName' | 'lastName'>;
   patientEntries: Array<PatientEntry & {
     outcome?: Outcome;
-    customFieldValues?: CustomFieldValue[];
   }>;
 }
 
@@ -393,7 +326,6 @@ export type PatientEntryRepository = Repository<PatientEntry, PatientEntryId>;
 export type ClientRepository = Repository<Client, ClientId>;
 export type ActivityRepository = Repository<Activity, ActivityId>;
 export type OutcomeRepository = Repository<Outcome, OutcomeId>;
-export type CustomFieldRepository = Repository<CustomField, CustomFieldId>;
 
 // Service dependencies extended for healthcare
 export interface HealthcareServiceDependencies extends ServiceDependencies {
@@ -402,5 +334,4 @@ export interface HealthcareServiceDependencies extends ServiceDependencies {
   clientRepo: ClientRepository;
   activityRepo: ActivityRepository;
   outcomeRepo: OutcomeRepository;
-  customFieldRepo: CustomFieldRepository;
 }

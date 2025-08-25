@@ -7,6 +7,9 @@ process.env.JWT_SECRET = 'test-jwt-secret-key-for-testing';
 process.env.JWT_REFRESH_SECRET = 'test-refresh-secret-key-for-testing';
 process.env.DB_PATH = ':memory:';
 
+// Enable all features for testing
+process.env.FEATURE_CUSTOM_FORMS_ENABLED = 'true';
+
 // Mock console methods to reduce noise in tests
 global.console = {
   ...console,

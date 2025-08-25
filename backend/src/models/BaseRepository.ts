@@ -1,4 +1,5 @@
 // Base Repository following SQLite documentation patterns
+import Database from 'better-sqlite3';
 import { db } from '@/database/connection';
 import { logger } from '@/utils/logger';
 import { v4 as uuidv4 } from 'uuid';
@@ -17,14 +18,24 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
   protected abstract toDatabase(domain: Partial<TDomain>): Partial<TDatabase>;
 
   // Generic find by ID with soft delete support
-  async findById(id: TKey): Promise<TDomain | null> {
+  findById(id: TKey): TDomain | null {
     try {
-      const stmt = await this.db.prepare(`
-        SELECT * FROM ${this.tableName} 
-        WHERE id = ? AND (deleted_at IS NULL OR deleted_at = '')
-      `);
+      // First try with deleted_at column (for tables that support soft delete)
+      let stmt: Database.Statement;
+      try {
+        stmt = this.db.prepare(`
+          SELECT * FROM ${this.tableName} 
+          WHERE id = ? AND (deleted_at IS NULL OR deleted_at = '')
+        `);
+      } catch (error) {
+        // If deleted_at column doesn't exist, fallback to simple query
+        stmt = this.db.prepare(`
+          SELECT * FROM ${this.tableName} 
+          WHERE id = ?
+        `);
+      }
       
-      const row = await stmt.get(id) as TDatabase | undefined;
+      const row = stmt.get(id) as TDatabase | undefined;
       
       if (!row) {
         return null;
@@ -38,20 +49,20 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
   }
 
   // Generic find all with pagination and filtering
-  async findAll(options: {
+  findAll(options: {
     page?: number;
     limit?: number;
     orderBy?: string;
     order?: 'ASC' | 'DESC';
     where?: string;
     params?: any[];
-  } = {}): Promise<{
+  } = {}): {
     items: TDomain[];
     total: number;
     page: number;
     limit: number;
     totalPages: number;
-  }> {
+  } {
     try {
       const { 
         page = 1, 
@@ -71,23 +82,23 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
       }
 
       // Get items
-      const stmt = await this.db.prepare(`
+      const stmt = this.db.prepare(`
         SELECT * FROM ${this.tableName}
         WHERE ${whereClause}
         ORDER BY ${orderBy} ${order}
         LIMIT ? OFFSET ?
       `);
 
-      const rows = await stmt.all(...params, limit, offset) as TDatabase[];
+      const rows = stmt.all(...params, limit, offset) as TDatabase[];
       const items = rows.map(row => this.fromDatabase(row));
 
       // Get total count
-      const countStmt = await this.db.prepare(`
+      const countStmt = this.db.prepare(`
         SELECT COUNT(*) as total FROM ${this.tableName} 
         WHERE ${whereClause}
       `);
 
-      const countResult = await countStmt.get(...params) as { total: number };
+      const countResult = countStmt.get(...params) as { total: number };
       const total = countResult.total;
 
       return {
@@ -104,7 +115,7 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
   }
 
   // Generic create with audit logging
-  async create(data: Omit<TDomain, 'id' | 'createdAt' | 'updatedAt'>, userId: UserId): Promise<TDomain> {
+  create(data: Omit<TDomain, 'id' | 'createdAt' | 'updatedAt'>, userId: UserId): TDomain {
     try {
       const id = typeof data === 'object' && 'id' in data ? (data as any).id : uuidv4();
       const now = new Date().toISOString();
@@ -120,19 +131,21 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
       const placeholders = columns.map(() => '?').join(', ');
       const values = Object.values(dbData);
 
-      const stmt = await this.db.prepare(`
+      const stmt = this.db.prepare(`
         INSERT INTO ${this.tableName} (${columns.join(', ')})
         VALUES (${placeholders})
       `);
 
-      await this.db.transaction(async () => {
-        await stmt.run(...values);
+      this.db.transaction(() => {
+        stmt.run(...values);
         
         // Log to audit table
-        await this.logAudit(id, 'INSERT', null, { id, ...data }, userId);
+        if (userId) {
+          this.logAudit(id, 'INSERT', null, { id, ...data }, userId);
+        }
       })();
       
-      const created = await this.findById(id as TKey);
+      const created = this.findById(id as TKey);
       if (!created) {
         throw new Error('Failed to retrieve created record');
       }
@@ -146,9 +159,9 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
   }
 
   // Generic update with audit logging
-  async update(id: TKey, data: Partial<TDomain>, userId: UserId): Promise<TDomain> {
+  update(id: TKey, data: Partial<TDomain>, userId: UserId): TDomain {
     try {
-      const oldRecord = await this.findById(id);
+      const oldRecord = this.findById(id);
       if (!oldRecord) {
         throw new Error(`${this.tableName} not found: ${id}`);
       }
@@ -172,24 +185,24 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
       const setClause = columns.map(col => `${col} = ?`).join(', ');
       const values = Object.values(updateData);
 
-      const stmt = await this.db.prepare(`
+      const stmt = this.db.prepare(`
         UPDATE ${this.tableName} 
         SET ${setClause}
         WHERE id = ? AND (deleted_at IS NULL OR deleted_at = '')
       `);
 
-      await this.db.transaction(async () => {
-        const result = await stmt.run(...values, id);
+      this.db.transaction(() => {
+        const result = stmt.run(...values, id);
         
         if (result.changes === 0) {
           throw new Error(`Failed to update ${this.tableName}: ${id}`);
         }
         
         // Log to audit table
-        await this.logAudit(id, 'UPDATE', oldRecord, { ...oldRecord, ...data }, userId);
+        this.logAudit(id, 'UPDATE', oldRecord, { ...oldRecord, ...data }, userId);
       })();
 
-      const updated = await this.findById(id);
+      const updated = this.findById(id);
       if (!updated) {
         throw new Error('Failed to retrieve updated record');
       }
@@ -203,29 +216,29 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
   }
 
   // Soft delete with audit logging
-  async softDelete(id: TKey, userId: UserId): Promise<boolean> {
+  softDelete(id: TKey, userId: UserId): boolean {
     try {
-      const oldRecord = await this.findById(id);
+      const oldRecord = this.findById(id);
       if (!oldRecord) {
         throw new Error(`${this.tableName} not found: ${id}`);
       }
 
       const now = new Date().toISOString();
-      const stmt = await this.db.prepare(`
+      const stmt = this.db.prepare(`
         UPDATE ${this.tableName} 
         SET deleted_at = ?, updated_at = ?
         WHERE id = ? AND (deleted_at IS NULL OR deleted_at = '')
       `);
 
-      await this.db.transaction(async () => {
-        const result = await stmt.run(now, now, id);
+      this.db.transaction(() => {
+        const result = stmt.run(now, now, id);
         
         if (result.changes === 0) {
           throw new Error(`Failed to delete ${this.tableName}: ${id}`);
         }
         
         // Log to audit table
-        await this.logAudit(id, 'DELETE', oldRecord, { ...oldRecord, deletedAt: now }, userId);
+        this.logAudit(id, 'DELETE', oldRecord, { ...oldRecord, deletedAt: now }, userId);
       })();
 
       logger.info(`${this.tableName} soft deleted`, { id, userId });
@@ -237,26 +250,26 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
   }
 
   // Hard delete (use sparingly)
-  async hardDelete(id: TKey, userId: UserId): Promise<boolean> {
+  hardDelete(id: TKey, userId: UserId): boolean {
     try {
-      const oldRecord = await this.findById(id);
+      const oldRecord = this.findById(id);
       if (!oldRecord) {
         return false; // Already deleted
       }
 
-      const stmt = await this.db.prepare(`
+      const stmt = this.db.prepare(`
         DELETE FROM ${this.tableName} WHERE id = ?
       `);
 
-      await this.db.transaction(async () => {
-        const result = await stmt.run(id);
+      this.db.transaction(() => {
+        const result = stmt.run(id);
         
         if (result.changes === 0) {
           throw new Error(`Failed to hard delete ${this.tableName}: ${id}`);
         }
         
         // Log to audit table
-        await this.logAudit(id, 'DELETE', oldRecord, null, userId);
+        this.logAudit(id, 'DELETE', oldRecord, null, userId);
       })();
 
       logger.info(`${this.tableName} hard deleted`, { id, userId });
@@ -288,20 +301,20 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
   }
 
   // Audit logging helper
-  protected async logAudit(
+  protected logAudit(
     recordId: TKey, 
     action: 'INSERT' | 'UPDATE' | 'DELETE', 
     oldValues: any, 
     newValues: any, 
     userId: UserId
-  ): Promise<void> {
+  ): void {
     try {
-      const auditStmt = await this.db.prepare(`
+      const auditStmt = this.db.prepare(`
         INSERT INTO audit_log (table_name, record_id, action, old_values, new_values, user_id)
         VALUES (?, ?, ?, ?, ?, ?)
       `);
 
-      await auditStmt.run(
+      auditStmt.run(
         this.tableName,
         recordId,
         action,
@@ -338,14 +351,59 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
     return value || null;
   }
 
+  // Create with auto-increment ID (for reference tables like clients, activities, outcomes)
+  protected createWithAutoIncrement(data: Omit<TDomain, 'id' | 'createdAt' | 'updatedAt'>, userId: UserId): TDomain {
+    try {
+      const now = new Date().toISOString();
+      const dbData = this.toDatabase({
+        ...data as any,
+        createdAt: now,
+        updatedAt: now
+      });
+
+      // Remove id from data since it's auto-increment
+      delete (dbData as any).id;
+
+      const columns = Object.keys(dbData);
+      const placeholders = columns.map(() => '?').join(', ');
+      const values = Object.values(dbData);
+
+      const stmt = this.db.prepare(`
+        INSERT INTO ${this.tableName} (${columns.join(', ')})
+        VALUES (${placeholders})
+      `);
+
+      let result: any;
+      this.db.transaction(() => {
+        result = stmt.run(...values);
+        
+        // Log to audit table
+        if (userId) {
+          this.logAudit(result.lastInsertRowid, 'INSERT', null, { id: result.lastInsertRowid, ...data }, userId);
+        }
+      })();
+
+      const created = this.findById(result.lastInsertRowid as any);
+      if (!created) {
+        throw new Error('Failed to retrieve created record');
+      }
+
+      logger.info(`${this.tableName} created with auto-increment`, { id: result.lastInsertRowid, userId });
+      return created;
+    } catch (error) {
+      logger.error(`Failed to create ${this.tableName} with auto-increment`, { data, userId, error });
+      throw error;
+    }
+  }
+
   // Batch operations
-  async bulkCreate(items: Array<Omit<TDomain, 'id' | 'createdAt' | 'updatedAt'>>, userId: UserId): Promise<TDomain[]> {
+  bulkCreate(items: Array<Omit<TDomain, 'id' | 'createdAt' | 'updatedAt'>>, userId: UserId): TDomain[] {
     try {
       const results: TDomain[] = [];
       
-      await this.db.transaction(async () => {
+      this.db.transaction(() => {
         for (const item of items) {
-          const created = await this.create(item, userId);
+          const created = this.create(item, userId);
           results.push(created);
         }
       })();

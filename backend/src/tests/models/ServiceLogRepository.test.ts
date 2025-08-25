@@ -87,8 +87,14 @@ describe('ServiceLogRepository', () => {
 
     // Insert test data
     db.prepare(`INSERT INTO users (id, first_name, last_name) VALUES (?, ?, ?)`).run(testUserId, 'Test', 'User');
+    db.prepare(`INSERT INTO users (id, first_name, last_name) VALUES (?, ?, ?)`).run('other-user', 'Other', 'User');
+    db.prepare(`INSERT INTO users (id, first_name, last_name) VALUES (?, ?, ?)`).run('non-existent-user', 'Non', 'Existent');
+    db.prepare(`INSERT INTO users (id, first_name, last_name) VALUES (?, ?, ?)`).run('admin-user', 'Admin', 'User');
     db.prepare(`INSERT INTO clients (id, name) VALUES (?, ?)`).run(testClientId, 'Test Client');
+    db.prepare(`INSERT INTO clients (id, name) VALUES (?, ?)`).run(2, 'Test Client 2');
+    db.prepare(`INSERT INTO clients (id, name) VALUES (?, ?)`).run(999, 'Invalid Client');
     db.prepare(`INSERT INTO activities (id, name) VALUES (?, ?)`).run(testActivityId, 'Test Activity');
+    db.prepare(`INSERT INTO activities (id, name) VALUES (?, ?)`).run(999, 'Invalid Activity');
     db.prepare(`INSERT INTO outcomes (id, name) VALUES (?, ?)`).run(testOutcomeId, 'Test Outcome');
 
     repository = new ServiceLogRepository();
@@ -411,7 +417,7 @@ describe('ServiceLogRepository', () => {
         { userId: testUserId, clientId: testClientId, activityId: testActivityId, patientCount: 10, isDraft: false },
         { userId: testUserId, clientId: testClientId, activityId: testActivityId, patientCount: 5, isDraft: true },
         { userId: testUserId, clientId: testClientId, activityId: testActivityId, patientCount: 8, isDraft: false },
-        { userId: 'other-user', clientId: 2, activityId: 2, patientCount: 3, isDraft: false }
+        { userId: 'other-user', clientId: 2, activityId: testActivityId, patientCount: 3, isDraft: false }
       ];
 
       for (const log of logs) {
@@ -478,8 +484,8 @@ describe('ServiceLogRepository', () => {
   describe('error handling', () => {
     test('handles invalid foreign key references', async () => {
       const logData = {
-        userId: 'non-existent-user',
-        clientId: 999, // Non-existent client
+        userId: 'truly-non-existent-user',
+        clientId: 12345, // Non-existent client
         activityId: testActivityId,
         patientCount: 5,
         isDraft: false

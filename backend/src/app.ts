@@ -33,7 +33,7 @@ async function createApp() {
             callback(new Error('Not allowed by CORS'));
           }
         }
-      : (process.env.CORS_ORIGIN?.split(',') || ['http://localhost:3000']),
+      : (process.env.CORS_ORIGIN || 'http://localhost:3000').split(','),
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization'],
@@ -83,8 +83,9 @@ async function createApp() {
   // Import routes
   const authRoutes = await import('@/routes/auth');
   const adminRoutes = await import('@/routes/admin');
-  const customFieldRoutes = await import('@/routes/customFields');
-  // const serviceLogRoutes = await import('@/routes/serviceLogSimple');
+  // Note: customFieldRoutes removed in Phase 7.1 cleanup
+  const reportsRoutes = await import('@/routes/reports');
+  const serviceLogRoutes = await import('@/routes/serviceLog');
 
   // Rate limiting for authentication endpoints
   const authLimiter = rateLimit({
@@ -102,46 +103,9 @@ async function createApp() {
   // API routes
   app.use('/api/auth', authLimiter, authRoutes.default);
   app.use('/api/admin', adminRoutes.default);
-  app.use('/api/custom-fields', customFieldRoutes.customFieldRoutes);
-  
-  // Temporary mock service log endpoints for demo
-  app.get('/api/service-logs/options', (req, res) => {
-    res.json({
-      success: true,
-      data: {
-        clients: [
-          { id: '1', name: 'Downtown Clinic', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-          { id: '2', name: 'Community Health Center', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-          { id: '3', name: 'Regional Hospital', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-        ],
-        activities: [
-          { id: '1', name: 'General Consultation', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-          { id: '2', name: 'Physiotherapy', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-          { id: '3', name: 'Mental Health Counseling', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-        ],
-        outcomes: [
-          { id: '1', name: 'Treatment Completed', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-          { id: '2', name: 'Referred to Specialist', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() },
-          { id: '3', name: 'Follow-up Required', isActive: true, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() }
-        ]
-      },
-      timestamp: new Date().toISOString()
-    });
-  });
-
-  app.post('/api/service-logs', (req, res) => {
-    console.log('Service log submission received:', JSON.stringify(req.body, null, 2));
-    res.json({
-      success: true,
-      data: {
-        id: 'service-log-' + Date.now(),
-        ...req.body,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      },
-      timestamp: new Date().toISOString()
-    });
-  });
+  // Note: /api/custom-fields routes removed in Phase 7.1 cleanup
+  app.use('/api/reports', reportsRoutes.default);
+  app.use('/api/service-logs', serviceLogRoutes.default);
 
   // 404 handler for undefined routes
   app.use('*', (req, res) => {

@@ -27,6 +27,7 @@ export class ServiceLogRepository extends BaseRepository<ServiceLog, DatabaseSer
       userId: dbRow.user_id,
       clientId: dbRow.client_id,
       activityId: dbRow.activity_id,
+      serviceDate: dbRow.service_date,
       patientCount: dbRow.patient_count,
       isDraft: this.convertBooleanFromDb(dbRow.is_draft),
       submittedAt: this.convertDateFromDb(dbRow.submitted_at),
@@ -43,9 +44,10 @@ export class ServiceLogRepository extends BaseRepository<ServiceLog, DatabaseSer
     if (domain.userId !== undefined) result.user_id = domain.userId;
     if (domain.clientId !== undefined) result.client_id = domain.clientId;
     if (domain.activityId !== undefined) result.activity_id = domain.activityId;
+    if (domain.serviceDate !== undefined) result.service_date = domain.serviceDate;
     if (domain.patientCount !== undefined) result.patient_count = domain.patientCount;
     if (domain.isDraft !== undefined) result.is_draft = this.convertBooleanToDb(domain.isDraft);
-    if (domain.submittedAt !== undefined) result.submitted_at = this.convertDateToDb(domain.submittedAt);
+    if ('submittedAt' in domain) result.submitted_at = this.convertDateToDb(domain.submittedAt);
     if (domain.createdAt !== undefined) result.created_at = domain.createdAt;
     if (domain.updatedAt !== undefined) result.updated_at = domain.updatedAt;
 
@@ -105,51 +107,143 @@ export class ServiceLogRepository extends BaseRepository<ServiceLog, DatabaseSer
     }
   }
 
-  // Find service logs with filters
+  // Find service logs with filters - optimized for large datasets
   async findWithFilters(
     filters: ServiceLogFilters,
     options: PaginationOptions = {}
   ): Promise<PaginatedResult<ServiceLog>> {
-    const whereClauses: string[] = [];
-    const params: any[] = [];
+    try {
+      const { 
+        page = 1, 
+        limit = 20, 
+        orderBy = 'created_at', 
+        orderDirection = 'DESC' 
+      } = options;
+      
+      const offset = (page - 1) * limit;
+      const whereClauses: string[] = ['(sl.deleted_at IS NULL OR sl.deleted_at = \'\')'];
+      const params: any[] = [];
 
-    if (filters.userId) {
-      whereClauses.push('user_id = ?');
-      params.push(filters.userId);
+      // Build optimized WHERE clause with proper index usage
+      if (filters.userId) {
+        whereClauses.push('sl.user_id = ?');
+        params.push(filters.userId);
+      }
+
+      if (filters.clientId) {
+        whereClauses.push('sl.client_id = ?');
+        params.push(filters.clientId);
+      }
+
+      if (filters.activityId) {
+        whereClauses.push('sl.activity_id = ?');
+        params.push(filters.activityId);
+      }
+
+      if (filters.isDraft !== undefined) {
+        whereClauses.push('sl.is_draft = ?');
+        params.push(this.convertBooleanToDb(filters.isDraft));
+      }
+
+      // Use indexed date range queries
+      if (filters.startDate && filters.endDate) {
+        whereClauses.push('sl.service_date BETWEEN ? AND ?');
+        params.push(filters.startDate, filters.endDate);
+      } else if (filters.startDate) {
+        whereClauses.push('sl.service_date >= ?');
+        params.push(filters.startDate);
+      } else if (filters.endDate) {
+        whereClauses.push('sl.service_date <= ?');
+        params.push(filters.endDate);
+      }
+
+      const whereClause = whereClauses.join(' AND ');
+
+      // Use optimized query with prepared statements, joins for names and patient entry counts
+      const stmt = await this.db.prepare(`
+        SELECT 
+          sl.*,
+          c.name as client_name,
+          a.name as activity_name,
+          u.first_name as user_first_name,
+          u.last_name as user_last_name,
+          COALESCE(SUM(CASE WHEN pe.appointment_type = 'new' THEN 1 ELSE 0 END), 0) as new_count,
+          COALESCE(SUM(CASE WHEN pe.appointment_type = 'followup' THEN 1 ELSE 0 END), 0) as followup_count,
+          COALESCE(SUM(CASE WHEN pe.appointment_type = 'dna' THEN 1 ELSE 0 END), 0) as dna_count,
+          COUNT(pe.id) as total_appointments
+        FROM service_logs sl
+        LEFT JOIN clients c ON sl.client_id = c.id
+        LEFT JOIN activities a ON sl.activity_id = a.id
+        LEFT JOIN users u ON sl.user_id = u.id
+        LEFT JOIN patient_entries pe ON sl.id = pe.service_log_id AND (pe.deleted_at IS NULL OR pe.deleted_at = '')
+        WHERE ${whereClause}
+        GROUP BY sl.id, c.name, a.name, u.first_name, u.last_name
+        ORDER BY sl.${orderBy} ${orderDirection}
+        LIMIT ? OFFSET ?
+      `);
+
+      const countStmt = await this.db.prepare(`
+        SELECT COUNT(*) as total FROM service_logs sl
+        WHERE ${whereClause}
+      `);
+
+      // Execute queries with proper parameter handling
+      const rows = await stmt.all(...params, limit, offset) as (DatabaseServiceLog & {
+        client_name?: string;
+        activity_name?: string;
+        user_first_name?: string;
+        user_last_name?: string;
+        new_count: number;
+        followup_count: number;
+        dna_count: number;
+        total_appointments: number;
+      })[];
+      const countResult = await countStmt.get(...params) as { total: number };
+
+      const items = rows.map(row => {
+        const serviceLog = this.fromDatabase(row);
+        return {
+          ...serviceLog,
+          client: row.client_name ? {
+            id: serviceLog.clientId,
+            name: row.client_name,
+            isActive: true,
+            createdAt: serviceLog.createdAt,
+            updatedAt: serviceLog.updatedAt
+          } : undefined,
+          activity: row.activity_name ? {
+            id: serviceLog.activityId,
+            name: row.activity_name,
+            isActive: true,
+            createdAt: serviceLog.createdAt,
+            updatedAt: serviceLog.updatedAt
+          } : undefined,
+          user: (row.user_first_name && row.user_last_name) ? {
+            id: serviceLog.userId,
+            firstName: row.user_first_name,
+            lastName: row.user_last_name
+          } : undefined,
+          // Add appointment breakdown
+          appointmentBreakdown: {
+            new: row.new_count,
+            followup: row.followup_count,
+            dna: row.dna_count,
+            total: row.total_appointments
+          }
+        };
+      });
+      const total = countResult.total;
+
+      return {
+        items,
+        total,
+        page,
+        limit,
+        pages: Math.ceil(total / limit)
+      };
+    } catch (error) {
+      throw new Error(`Failed to find service logs with filters: ${error}`);
     }
-
-    if (filters.clientId) {
-      whereClauses.push('client_id = ?');
-      params.push(filters.clientId);
-    }
-
-    if (filters.activityId) {
-      whereClauses.push('activity_id = ?');
-      params.push(filters.activityId);
-    }
-
-    if (filters.isDraft !== undefined) {
-      whereClauses.push('is_draft = ?');
-      params.push(this.convertBooleanToDb(filters.isDraft));
-    }
-
-    if (filters.startDate) {
-      whereClauses.push('created_at >= ?');
-      params.push(filters.startDate);
-    }
-
-    if (filters.endDate) {
-      whereClauses.push('created_at <= ?');
-      params.push(filters.endDate);
-    }
-
-    const whereClause = whereClauses.length > 0 ? whereClauses.join(' AND ') : '';
-
-    return await this.findAll({
-      ...options,
-      where: whereClause,
-      params
-    });
   }
 
   // Get service log with full details (joins)
@@ -287,11 +381,11 @@ export class ServiceLogRepository extends BaseRepository<ServiceLog, DatabaseSer
 
     return await this.update(id, {
       isDraft: true,
-      submittedAt: undefined
+      submittedAt: null
     }, userId);
   }
 
-  // Get statistics for service logs
+  // Get statistics for service logs - optimized with single query approach
   async getStatistics(filters?: ServiceLogFilters): Promise<{
     totalLogs: number;
     totalDrafts: number;
@@ -302,7 +396,7 @@ export class ServiceLogRepository extends BaseRepository<ServiceLog, DatabaseSer
     logsByActivity: Array<{ activityId: number; activityName: string; count: number }>;
   }> {
     try {
-      // Build WHERE clause for filters
+      // Build WHERE clause for filters with optimized parameter binding
       const whereClauses: string[] = ['(sl.deleted_at IS NULL OR sl.deleted_at = \'\')'];
       const params: any[] = [];
 
@@ -311,26 +405,27 @@ export class ServiceLogRepository extends BaseRepository<ServiceLog, DatabaseSer
         params.push(filters.userId);
       }
 
-      if (filters?.startDate) {
-        whereClauses.push('sl.created_at >= ?');
+      if (filters?.startDate && filters?.endDate) {
+        whereClauses.push('sl.service_date BETWEEN ? AND ?');
+        params.push(filters.startDate, filters.endDate);
+      } else if (filters?.startDate) {
+        whereClauses.push('sl.service_date >= ?');
         params.push(filters.startDate);
-      }
-
-      if (filters?.endDate) {
-        whereClauses.push('sl.created_at <= ?');
+      } else if (filters?.endDate) {
+        whereClauses.push('sl.service_date <= ?');
         params.push(filters.endDate);
       }
 
       const whereClause = whereClauses.join(' AND ');
 
-      // Get basic statistics
+      // Single optimized query for basic statistics
       const basicStatsStmt = await this.db.prepare(`
         SELECT 
           COUNT(*) as total_logs,
-          SUM(CASE WHEN is_draft = 1 THEN 1 ELSE 0 END) as total_drafts,
-          SUM(CASE WHEN is_draft = 0 THEN 1 ELSE 0 END) as total_submitted,
-          SUM(patient_count) as total_patients,
-          AVG(patient_count) as average_patients_per_log
+          SUM(CASE WHEN sl.is_draft = 1 THEN 1 ELSE 0 END) as total_drafts,
+          SUM(CASE WHEN sl.is_draft = 0 THEN 1 ELSE 0 END) as total_submitted,
+          COALESCE(SUM(sl.patient_count), 0) as total_patients,
+          COALESCE(AVG(CAST(sl.patient_count AS FLOAT)), 0) as average_patients_per_log
         FROM service_logs sl
         WHERE ${whereClause}
       `);
@@ -343,7 +438,7 @@ export class ServiceLogRepository extends BaseRepository<ServiceLog, DatabaseSer
         average_patients_per_log: number;
       };
 
-      // Get logs by client
+      // Optimized client stats with LIMIT for performance
       const clientStatsStmt = await this.db.prepare(`
         SELECT 
           c.id as client_id,
@@ -354,15 +449,10 @@ export class ServiceLogRepository extends BaseRepository<ServiceLog, DatabaseSer
         WHERE ${whereClause}
         GROUP BY c.id, c.name
         ORDER BY count DESC
+        LIMIT 20
       `);
 
-      const clientStats = await clientStatsStmt.all(...params) as Array<{
-        client_id: number;
-        client_name: string;
-        count: number;
-      }>;
-
-      // Get logs by activity
+      // Optimized activity stats with LIMIT for performance
       const activityStatsStmt = await this.db.prepare(`
         SELECT 
           a.id as activity_id,
@@ -373,20 +463,29 @@ export class ServiceLogRepository extends BaseRepository<ServiceLog, DatabaseSer
         WHERE ${whereClause}
         GROUP BY a.id, a.name
         ORDER BY count DESC
+        LIMIT 20
       `);
 
-      const activityStats = await activityStatsStmt.all(...params) as Array<{
-        activity_id: number;
-        activity_name: string;
-        count: number;
-      }>;
+      // Execute all queries in parallel for better performance
+      const [clientStats, activityStats] = await Promise.all([
+        clientStatsStmt.all(...params) as Array<{
+          client_id: number;
+          client_name: string;
+          count: number;
+        }>,
+        activityStatsStmt.all(...params) as Array<{
+          activity_id: number;
+          activity_name: string;
+          count: number;
+        }>
+      ]);
 
       return {
-        totalLogs: basicStats.total_logs,
-        totalDrafts: basicStats.total_drafts,
-        totalSubmitted: basicStats.total_submitted,
-        totalPatients: basicStats.total_patients,
-        averagePatientsPerLog: Math.round(basicStats.average_patients_per_log * 100) / 100,
+        totalLogs: basicStats.total_logs || 0,
+        totalDrafts: basicStats.total_drafts || 0,
+        totalSubmitted: basicStats.total_submitted || 0,
+        totalPatients: basicStats.total_patients || 0,
+        averagePatientsPerLog: Math.round((basicStats.average_patients_per_log || 0) * 100) / 100,
         logsByClient: clientStats.map(stat => ({
           clientId: stat.client_id,
           clientName: stat.client_name,
@@ -409,12 +508,11 @@ export class ServiceLogRepository extends BaseRepository<ServiceLog, DatabaseSer
       const logs = await this.findByUser(userId);
       let deleteCount = 0;
 
-      await this.db.transaction(async () => {
-        for (const log of logs.items) {
-          await this.softDelete(log.id, deleteUserId);
-          deleteCount++;
-        }
-      })();
+      // Can't use transaction with async operations, do them individually
+      for (const log of logs.items) {
+        this.softDelete(log.id, deleteUserId);
+        deleteCount++;
+      }
 
       return deleteCount;
     } catch (error) {

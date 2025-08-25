@@ -158,12 +158,14 @@ export interface ServiceLog {
   userId: UserId;
   clientId: ClientId;
   activityId: ActivityId;
+  serviceDate?: ISODateString; // Added service date field
   patientCount: number;
   isDraft: boolean;
   submittedAt?: ISODateString;
   createdAt: ISODateString;
   updatedAt: ISODateString;
   patientEntries: PatientEntry[];
+  additionalNotes?: string;
 }
 
 // Service Log Form Types - Following React Hook Form documentation patterns
@@ -173,6 +175,7 @@ export interface ServiceLogFormData {
   serviceDate: string; // ISO date string
   patientCount: number;
   patientEntries: PatientEntry[];
+  additionalNotes?: string;
 }
 
 export interface ServiceLogFormProps {

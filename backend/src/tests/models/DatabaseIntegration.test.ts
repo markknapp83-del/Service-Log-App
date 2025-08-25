@@ -31,10 +31,10 @@ describe('Database Integration Tests', () => {
     db.pragma('foreign_keys = ON');
 
     // Create all tables using the schema
-    const originalDb = (await import('@/database/connection.js')).db;
+    const originalDb = (await import('@/database/connection')).db;
     
     // Override the database connection for all repositories
-    (await import('@/database/connection.js')).db = db;
+    (await import('@/database/connection')).db = db;
 
     await createTables();
 

@@ -10,8 +10,8 @@ export class JWTUtils {
   private readonly refreshTokenExpiry: string;
 
   constructor() {
-    this.accessTokenSecret = process.env.JWT_SECRET;
-    this.refreshTokenSecret = process.env.JWT_REFRESH_SECRET;
+    this.accessTokenSecret = process.env.JWT_SECRET || '';
+    this.refreshTokenSecret = process.env.JWT_REFRESH_SECRET || '';
     this.accessTokenExpiry = process.env.NODE_ENV === 'production' ? '15m' : '1h';
     this.refreshTokenExpiry = '7d';
 
@@ -23,7 +23,7 @@ export class JWTUtils {
   generateAccessToken(payload: Omit<JWTPayload, 'iat' | 'exp'>): string {
     try {
       return jwt.sign(
-        payload,
+        payload as object,
         this.accessTokenSecret,
         {
           expiresIn: this.accessTokenExpiry,
@@ -40,7 +40,7 @@ export class JWTUtils {
   generateRefreshToken(payload: Omit<RefreshTokenPayload, 'iat' | 'exp'>): string {
     try {
       return jwt.sign(
-        payload,
+        payload as object,
         this.refreshTokenSecret,
         {
           expiresIn: this.refreshTokenExpiry,

@@ -8,7 +8,7 @@ class DatabaseConnection {
   constructor() {
     const dbPath = process.env.NODE_ENV === 'test' 
       ? ':memory:' 
-      : (process.env.DB_PATH || './healthcare.db');
+      : (process.env.DB_PATH || './database/healthcare.db');
     
     this.db = new Database(dbPath);
     
@@ -61,7 +61,7 @@ class DatabaseConnection {
 
   // Transaction support
   transaction<T>(fn: () => T): T {
-    return this.db.transaction(fn)();
+    return this.db.transaction(fn);
   }
 }
 

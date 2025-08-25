@@ -8,27 +8,22 @@ import { z } from 'zod';
 const router = Router();
 const serviceLogController = new ServiceLogController();
 
-// Validation schemas following Zod documentation patterns
+// Validation schemas following Zod documentation patterns - Phase 3.5 appointment-based structure
 const patientEntrySchema = z.object({
-  newPatients: z.number().int().min(0),
-  followupPatients: z.number().int().min(0),
-  dnaCount: z.number().int().min(0),
-  outcomeId: z.string().uuid(),
+  appointmentType: z.enum(['new', 'followup', 'dna']),
+  outcomeId: z.union([z.string(), z.number()]).transform(String), // Accept both string and number, convert to string
 });
 
 const createServiceLogSchema = z.object({
-  clientId: z.string().uuid('Invalid client ID'),
-  activityId: z.string().uuid('Invalid activity ID'),
+  clientId: z.union([z.string(), z.number()]).transform(String), // Accept both string and number, convert to string
+  activityId: z.union([z.string(), z.number()]).transform(String), // Accept both string and number, convert to string
+  serviceDate: z.string().min(1, 'Service date is required'),
   patientCount: z.number().int().min(1).max(100),
   patientEntries: z.array(patientEntrySchema).min(1),
   isDraft: z.boolean().optional().default(false),
 }).refine((data) => {
-  // Validate patient entries match patient count
-  const totalPatients = data.patientEntries.reduce(
-    (sum, entry) => sum + entry.newPatients + entry.followupPatients,
-    0
-  );
-  return totalPatients === data.patientCount;
+  // Validate patient entries match patient count (each entry = 1 appointment)
+  return data.patientEntries.length === data.patientCount;
 }, {
   message: 'Patient entries must match total patient count',
   path: ['patientEntries'],
@@ -40,8 +35,11 @@ const queryParamsSchema = z.object({
   page: z.string().regex(/^\d+$/).transform(Number).optional(),
   limit: z.string().regex(/^\d+$/).transform(Number).optional(),
   isDraft: z.enum(['true', 'false']).optional(),
-  clientId: z.string().uuid().optional(),
-  activityId: z.string().uuid().optional(),
+  clientId: z.string().optional(),
+  activityId: z.string().optional(),
+  dateFrom: z.string().datetime().optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+  dateTo: z.string().datetime().optional().or(z.string().regex(/^\d{4}-\d{2}-\d{2}$/)).optional(),
+  userId: z.string().optional(), // Admin-only filter
 });
 
 const idParamSchema = z.object({

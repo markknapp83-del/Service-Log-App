@@ -18,13 +18,13 @@ const appointmentTypeSchema = z.enum(['new', 'followup', 'dna'], {
 // Patient entry schema - following medical data validation patterns
 const patientEntrySchema = z.object({
   appointmentType: appointmentTypeSchema,
-  outcomeId: requiredStringSchema.min(1, 'Please select an outcome'),
+  outcomeId: z.number().int('Please select an outcome').min(1, 'Please select an outcome'),
 });
 
 // Service log form schema - following React Hook Form + Zod patterns
 export const serviceLogFormSchema = z.object({
-  clientId: requiredStringSchema.min(1, 'Please select a client/site'),
-  activityId: requiredStringSchema.min(1, 'Please select an activity'),
+  clientId: z.number().int('Please select a client/site').min(1, 'Please select a client/site'),
+  activityId: z.number().int('Please select an activity').min(1, 'Please select an activity'),
   serviceDate: z.string()
     .min(1, 'Service date is required')
     .refine((date) => {
@@ -37,7 +37,6 @@ export const serviceLogFormSchema = z.object({
     .max(100, 'Cannot exceed 100 patient entries per session'),
   patientEntries: z.array(patientEntrySchema)
     .min(1, 'At least one patient entry is required'),
-  customFields: z.record(z.string(), z.any()).optional(),
   additionalNotes: z.string().optional(),
 }).refine((data) => {
   // Validate that patient entries match patient count

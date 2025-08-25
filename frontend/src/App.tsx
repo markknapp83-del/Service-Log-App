@@ -8,6 +8,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { ServiceLogPage } from './pages/ServiceLogPage';
 import { UserManagementPage } from './pages/UserManagementPage';
 import { TemplateManagementPage } from './pages/TemplateManagementPage';
+import { SubmissionsPage } from './pages/SubmissionsPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { Toast } from './components/Toast';
 
@@ -59,6 +60,16 @@ function App() {
               }
             />
             
+            {/* Submissions/Reports - Available to both admin and candidates */}
+            <Route
+              path="/submissions"
+              element={
+                <ProtectedRoute>
+                  <SubmissionsPage />
+                </ProtectedRoute>
+              }
+            />
+            
             {/* Default redirect */}
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             
@@ -85,6 +96,14 @@ function App() {
                           className="text-blue-600 hover:text-blue-500 underline block"
                         >
                           Template Management
+                        </Link>
+                      </div>
+                      <div>
+                        <Link 
+                          to="/submissions" 
+                          className="text-blue-600 hover:text-blue-500 underline block"
+                        >
+                          View Submissions & Reports
                         </Link>
                       </div>
                     </div>

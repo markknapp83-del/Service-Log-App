@@ -68,8 +68,17 @@ Building a healthcare service log portal for tracking patient services with dyna
 - **Frontend uses any available port** - Vite auto-assigns (3000+ range)
 - **If login fails with "Failed to fetch"**: 
   1. Check backend is running: `curl http://localhost:5000/health`
-  2. Restart both servers: `npm run dev` in both frontend/ and backend/
-  3. CORS will automatically allow the new frontend port
+  2. **🚨 CRITICAL: Check `frontend/.env` file** - VITE_API_BASE_URL must match backend port
+  3. Restart both servers: `npm run dev` in both frontend/ and backend/
+  4. CORS will automatically allow the new frontend port
+
+### 🔧 Environment Variable Debug (LESSON LEARNED)
+**Most "Failed to fetch" errors are caused by wrong API URLs in environment files:**
+- Check `frontend/.env` for `VITE_API_BASE_URL` 
+- Must match actual backend port (e.g., `http://localhost:5003/api`)
+- Environment variables OVERRIDE Vite proxy configuration
+- Restart frontend after changing `.env` files
+- **Always check .env files FIRST when debugging API connectivity**
 
 ## Agent Usage Guidelines
 

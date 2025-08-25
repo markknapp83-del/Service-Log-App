@@ -44,7 +44,7 @@ export function EntityModal({ isOpen, onClose, onSuccess, entityType, entity }: 
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('authToken');
+      const token = localStorage.getItem('healthcare_portal_token');
       const url = isEditing 
         ? `/api/admin/templates/${entityType}/${entity.id}`
         : `/api/admin/templates/${entityType}`;

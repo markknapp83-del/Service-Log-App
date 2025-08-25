@@ -24,12 +24,24 @@ export function ServiceLogPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [demoModeShown, setDemoModeShown] = useState(false);
+  const [isLoadingOptions, setIsLoadingOptions] = useState(false); // Prevent concurrent API calls
   const { showToast } = useToast();
 
   // Load form options from real API
-  const loadFormOptions = async () => {
+  const loadFormOptions = async (showSuccessToast = false) => {
+    // Prevent concurrent API calls
+    if (isLoadingOptions) {
+      console.log('Form options already loading, skipping duplicate request');
+      return;
+    }
+
     try {
-      setIsLoading(true);
+      setIsLoadingOptions(true);
+      
+      // Only show loading state on initial load, not on polls/refreshes
+      if (!formOptions) {
+        setIsLoading(true);
+      }
       
       // Use real API endpoint for form options
       const response = await apiService.get('/service-logs/options');
@@ -37,10 +49,10 @@ export function ServiceLogPage() {
       if (response.success) {
         setFormOptions(response.data);
         
-        if (!demoModeShown) {
+        if (showSuccessToast || (!demoModeShown)) {
           showToast({
             type: 'success',
-            message: 'Form options loaded: Ready to create service log entries.',
+            message: showSuccessToast ? 'Form options refreshed successfully.' : 'Form options loaded: Ready to create service log entries.',
           });
           setDemoModeShown(true);
         }
@@ -49,12 +61,16 @@ export function ServiceLogPage() {
       }
     } catch (error) {
       console.error('Failed to load form options:', error);
-      showToast({
-        type: 'error',
-        message: `Failed to load form options: ${error instanceof Error ? error.message : 'Please refresh to try again.'}`,
-      });
+      // Only show error if this is the initial load or a manual refresh
+      if (!formOptions || showSuccessToast) {
+        showToast({
+          type: 'error',
+          message: `Failed to load form options: ${error instanceof Error ? error.message : 'Please refresh to try again.'}`,
+        });
+      }
     } finally {
       setIsLoading(false);
+      setIsLoadingOptions(false);
     }
   };
 
@@ -64,6 +80,8 @@ export function ServiceLogPage() {
 
   // Poll for template updates every 30 seconds when page is active
   useEffect(() => {
+    let pollInterval: NodeJS.Timeout;
+    
     const handleVisibilityChange = () => {
       if (!document.hidden && formOptions) {
         // Reload form options when page becomes visible (user switches back)
@@ -71,18 +89,23 @@ export function ServiceLogPage() {
       }
     };
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    // Only set up polling if formOptions is loaded
+    if (formOptions) {
+      document.addEventListener('visibilitychange', handleVisibilityChange);
 
-    // Optional: Poll every 30 seconds for updates
-    const pollInterval = setInterval(() => {
-      if (!document.hidden && formOptions) {
-        loadFormOptions();
-      }
-    }, 30000);
+      // Optional: Poll every 5 minutes for updates (reduced from 30 seconds to prevent form instability)
+      pollInterval = setInterval(() => {
+        if (!document.hidden) {
+          loadFormOptions(); // Silent refresh - no toasts
+        }
+      }, 300000); // 5 minutes instead of 30 seconds
+    }
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
-      clearInterval(pollInterval);
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
     };
   }, [formOptions]);
 
@@ -92,7 +115,7 @@ export function ServiceLogPage() {
       type: 'info',
       message: 'Refreshing form options...',
     });
-    await loadFormOptions();
+    await loadFormOptions(true); // Pass true to show success/error toasts
   };
 
 
@@ -108,6 +131,7 @@ export function ServiceLogPage() {
         serviceDate: data.serviceDate,
         patientCount: data.patientCount,
         patientEntries: data.patientEntries,
+        additionalNotes: data.additionalNotes || '',
         isDraft: false
       });
       
@@ -152,6 +176,7 @@ export function ServiceLogPage() {
         serviceDate: data.serviceDate,
         patientCount: data.patientCount,
         patientEntries: data.patientEntries,
+        additionalNotes: data.additionalNotes || '',
         isDraft: true,
       });
 

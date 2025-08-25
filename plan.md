@@ -1058,6 +1058,229 @@ describe('Reporting API', () => {
 
 ---
 
+## Phase 7.1: Database Simplification & Infrastructure Cleanup (URGENT)
+**📚 PRIMARY DOCUMENTATION**: [SQLite](./devdocs/sqlite-better-sqlite3.md) + [Jest](./devdocs/jest.md) + [React 18](./devdocs/react-18.md) + [Express.js](./devdocs/express.md)
+
+### Objectives
+**CRITICAL PRE-PHASE 8**: Remove over-engineered Phase 6.5 client-specific custom field infrastructure that is causing client field entry problems and database performance issues. Simplify database schema to core healthcare service logging functionality following documented patterns.
+
+### 🚨 MANDATORY Pre-Phase Steps
+1. **Read [SQLite Documentation](./devdocs/sqlite-better-sqlite3.md)** - Database cleanup, migration patterns, and performance optimization
+2. **Study [Jest Documentation](./devdocs/jest.md)** - Test-driven database migration and cleanup testing patterns
+3. **Review [React 18 Documentation](./devdocs/react-18.md)** - Component cleanup and hook simplification patterns
+4. **Check [Express.js Documentation](./devdocs/express.md)** - API endpoint removal and route cleanup patterns
+5. **Follow documented TDD approach** - Write failing tests first, then implement cleanup
+
+### 🔍 Problem Analysis (Senior Engineer Assessment)
+**Root Cause**: Phase 6.5 added complex client-specific custom field infrastructure that Phase 6.6 disabled, creating:
+- **3 unnecessary database tables** (custom_fields, field_choices, custom_field_values)
+- **7 unused indexes** for disabled custom field functionality
+- **5 unused API endpoints** processing disabled features
+- **Complex frontend hooks** triggering unnecessary API calls
+- **50-70% overhead** in client selection database queries
+
+**Impact on Client Field Entry**: Every client selection triggers queries on 3 unused tables with complex joins, causing the persistent "client field entry problems" identified in debugging.
+
+### Pre-Phase Test Specifications (TDD MANDATORY)
+**📖 Follow database cleanup testing patterns from [Jest Documentation](./devdocs/jest.md):**
+
+#### Database Migration Tests (backend/tests/database-cleanup.test.ts)
+**Write FAILING tests first, then implement cleanup:**
+```typescript
+describe('Database Simplification - Phase 7.1', () => {
+  describe('Custom Field Infrastructure Removal', () => {
+    test('custom_fields table should not exist after cleanup')
+    test('field_choices table should not exist after cleanup') 
+    test('custom_field_values table should not exist after cleanup')
+    test('custom field indexes should be removed')
+    test('core healthcare tables remain intact and functional')
+  })
+
+  describe('Client Selection Performance', () => {
+    test('client dropdown loads without custom field queries')
+    test('client selection response time < 100ms (was >300ms)')
+    test('no custom field API calls triggered on client change')
+    test('database query count reduced by 50%+ for client operations')
+  })
+})
+```
+
+#### API Endpoint Cleanup Tests (backend/tests/api-cleanup.test.ts)
+```typescript
+describe('API Endpoint Cleanup', () => {
+  test('GET /api/admin/clients/:id/fields should return 404')
+  test('POST /api/admin/clients/:id/fields should return 404') 
+  test('PUT /api/admin/clients/:id/fields/:fieldId should return 404')
+  test('DELETE /api/admin/clients/:id/fields/:fieldId should return 404')
+  test('GET /api/form-config/:clientId should return 404')
+  test('core client endpoints remain functional')
+})
+```
+
+#### Frontend Simplification Tests (frontend/tests/component-cleanup.test.tsx)
+```typescript
+describe('Frontend Infrastructure Cleanup', () => {
+  test('ServiceLogForm loads without useClientCustomFields hook')
+  test('client selection does not trigger custom field API calls')
+  test('Additional Information section shows only notes field')
+  test('ClientFieldManager component removed')
+  test('form state management simplified')
+  test('no custom field-related error toasts on client selection')
+})
+```
+
+### Implementation Strategy (TDD APPROACH)
+
+#### Step 1: Database Schema Cleanup
+**📖 Follow [SQLite Documentation](./devdocs/sqlite-better-sqlite3.md) migration patterns:**
+
+```sql
+-- Phase 7.1 Database Simplification Migration
+-- Write tests FIRST, then execute this cleanup
+
+-- 1. Remove custom field infrastructure (Phase 6.5 over-engineering)
+DROP TABLE IF EXISTS custom_field_values;
+DROP TABLE IF EXISTS field_choices;  
+DROP TABLE IF EXISTS custom_fields;
+
+-- 2. Indexes automatically removed with tables (7 indexes eliminated)
+
+-- 3. Verify core healthcare tables remain intact
+-- users, clients, activities, outcomes, service_logs, patient_entries, audit_log
+
+-- 4. Optimize remaining indexes for core functionality only
+CREATE INDEX IF NOT EXISTS idx_clients_name_active ON clients(name, is_active);
+CREATE INDEX IF NOT EXISTS idx_activities_name_active ON activities(name, is_active);
+CREATE INDEX IF NOT EXISTS idx_outcomes_name_active ON outcomes(name, is_active);
+```
+
+#### Step 2: Backend API Cleanup
+**📖 Follow [Express.js Documentation](./devdocs/express.md) endpoint removal patterns:**
+
+**REMOVE AdminController methods:**
+- `getClientFields()` - Unused client-specific field endpoint
+- `createClientField()` - Disabled functionality  
+- `updateClientField()` - Disabled functionality
+- `deleteClientField()` - Disabled functionality
+
+**REMOVE routes from admin.ts:**
+- `GET /clients/:clientId/fields`
+- `POST /clients/:clientId/fields`
+- `PUT /clients/:clientId/fields/:fieldId` 
+- `DELETE /clients/:clientId/fields/:fieldId`
+
+**REMOVE CustomFieldRepository:**
+- Entire file no longer needed for core functionality
+- Complex client-specific methods eliminated
+
+#### Step 3: Frontend Simplification  
+**📖 Follow [React 18 Documentation](./devdocs/react-18.md) component cleanup patterns:**
+
+**REMOVE unnecessary hooks:**
+```typescript
+// DELETE these files (Phase 6.5 over-engineering):
+- hooks/useClientCustomFields.ts (entire file)
+- components/ClientFieldManager.tsx (entire file)
+
+// SIMPLIFY ServiceLogForm:
+// BEFORE (complex Phase 6.5):
+const { fields, isLoading } = useClientCustomFields({ clientId: watchClientId });
+
+// AFTER (simplified core functionality):
+// Remove useClientCustomFields completely
+// Additional Information section: <textarea> for notes only
+```
+
+**SIMPLIFY customFieldApi.ts:**
+```typescript
+// REMOVE these methods (unused Phase 6.5 infrastructure):
+- getFormConfig()
+- getClientFields() 
+- createClientField()
+- updateClientField()
+- deleteClientField()
+
+// KEEP only if used for future features:
+- getActiveFields() (for potential global fields)
+```
+
+#### Step 4: Test Infrastructure Cleanup
+**📖 Follow [Jest Documentation](./devdocs/jest.md) test cleanup patterns:**
+
+**REMOVE test files:**
+- `backend/src/tests/api/client-fields.test.ts` (entire file)
+- `backend/src/tests/models/CustomFieldRepository.test.ts` (if exists)
+- `frontend/src/tests/ClientFieldManager.test.tsx` (if exists)
+
+### Performance Improvements Expected
+
+#### Database Performance
+- **Query Reduction**: 50-70% fewer queries on client selection
+- **Join Elimination**: No more unnecessary joins on 3 custom field tables  
+- **Index Optimization**: 7 fewer indexes to maintain
+- **Response Time**: Client selection < 100ms (was >300ms)
+
+#### Frontend Performance  
+- **State Management**: Simplified form state without custom field complexity
+- **API Calls**: Eliminated unnecessary custom field API requests
+- **Bundle Size**: Reduced by removing unused hooks and components
+- **Memory Usage**: Lower memory footprint without complex custom field state
+
+#### Developer Experience
+- **Codebase Complexity**: 30% reduction in lines of code
+- **Maintenance Overhead**: Eliminated unused test suites and infrastructure
+- **Debugging Simplicity**: Straightforward data flow without custom field edge cases
+
+### Deliverables (TDD Implementation Order)
+**🚨 Each deliverable MUST follow TDD: failing tests first, then implementation:**
+
+1. **Database Migration Script** → Use [SQLite Documentation](./devdocs/sqlite-better-sqlite3.md) patterns
+   - Write failing tests for table removal
+   - Create migration to drop custom field tables
+   - Verify core table integrity maintained
+
+2. **API Endpoint Removal** → Follow [Express.js Documentation](./devdocs/express.md) patterns  
+   - Write failing tests expecting 404 responses
+   - Remove custom field endpoints from AdminController
+   - Remove routes from admin router
+
+3. **Frontend Hook Simplification** → Use [React 18 Documentation](./devdocs/react-18.md) patterns
+   - Write failing tests for simplified form behavior
+   - Remove useClientCustomFields hook
+   - Simplify ServiceLogForm component
+
+4. **Repository Cleanup** → Follow [TypeScript Documentation](./devdocs/typescript.md) patterns
+   - Write failing tests confirming CustomFieldRepository removal
+   - Delete CustomFieldRepository.ts
+   - Update imports across codebase
+
+5. **Test Infrastructure Cleanup** → Use [Jest Documentation](./devdocs/jest.md) patterns
+   - Remove unused test files for custom fields
+   - Update existing tests to not expect custom field functionality
+   - Verify all remaining tests pass
+
+### Success Criteria (Measurable)
+- [ ] **Database**: Custom field tables removed, core tables functional
+- [ ] **Performance**: Client selection response time < 100ms  
+- [ ] **API**: Custom field endpoints return 404, core endpoints work
+- [ ] **Frontend**: Form loads without custom field hooks or API calls
+- [ ] **Tests**: All remaining tests pass, custom field tests removed
+- [ ] **Codebase**: 30% reduction in complexity, no custom field references
+- [ ] **User Experience**: Client selection works smoothly without delays
+
+### Agent Usage Strategy
+**📖 Use specialized agents following documented patterns:**
+
+1. **database-architect** → SQLite schema cleanup and migration
+2. **backend-architect** → API endpoint removal and route cleanup  
+3. **frontend-developer** → Component and hook simplification
+4. **test-writer-fixer** → TDD implementation and test cleanup
+5. **performance-benchmarker** → Measure improvement metrics
+
+**Rule**: Each agent must reference relevant devdocs before implementation and follow TDD approach.
+
+---
+
 ## Phase 8: Polish, Optimization & Deployment (Week 8)
 **📚 PRIMARY DOCUMENTATION**: [ALL DOCUMENTATION](./devdocs/index.md) - Comprehensive review and optimization
 

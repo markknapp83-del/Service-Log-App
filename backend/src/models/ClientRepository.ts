@@ -38,7 +38,7 @@ export class ClientRepository extends BaseRepository<Client, DatabaseClient, Cli
   }
 
   // Find clients by name (case-insensitive search)
-  async findByName(name: string): Promise<Client[]> {
+  findByName(name: string): Client[] {
     try {
       const stmt = this.db.prepare(`
         SELECT * FROM ${this.tableName}
@@ -55,7 +55,7 @@ export class ClientRepository extends BaseRepository<Client, DatabaseClient, Cli
   }
 
   // Get all active clients
-  async findActive(): Promise<Client[]> {
+  findActive(): Client[] {
     try {
       const stmt = this.db.prepare(`
         SELECT * FROM ${this.tableName}
@@ -102,7 +102,7 @@ export class ClientRepository extends BaseRepository<Client, DatabaseClient, Cli
       throw new Error(`Client name '${data.name}' already exists`);
     }
 
-    return this.create(data, userId);
+    return this.createWithAutoIncrement(data, userId);
   }
 
   // Update client with name uniqueness validation
@@ -157,8 +157,13 @@ export class ClientRepository extends BaseRepository<Client, DatabaseClient, Cli
     }
   }
 
+  // Delete client (soft delete)
+  delete(id: ClientId, userId: string): boolean {
+    return this.softDelete(id, userId);
+  }
+
   // Bulk create clients
-  async bulkCreateClients(clients: ClientCreateRequest[], userId: string): Promise<Client[]> {
+  bulkCreateClients(clients: ClientCreateRequest[], userId: string): Client[] {
     // Validate all names are unique
     const names = clients.map(c => c.name.toLowerCase());
     const uniqueNames = new Set(names);

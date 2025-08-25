@@ -64,7 +64,7 @@ export function TemplateManagementPage() {
   const loadTemplateData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('authToken');
+      const token = localStorage.getItem('healthcare_portal_token');
       
       // Load all template data in parallel
       const [clientsRes, activitiesRes, outcomesRes, customFieldsRes] = await Promise.all([
@@ -108,7 +108,7 @@ export function TemplateManagementPage() {
 
   const handleToggleActive = async (type: string, id: string, currentState: boolean) => {
     try {
-      const token = localStorage.getItem('authToken');
+      const token = localStorage.getItem('healthcare_portal_token');
       const response = await fetch(`/api/admin/templates/${type}/${id}`, {
         method: 'PUT',
         headers: {
@@ -215,7 +215,7 @@ export function TemplateManagementPage() {
 
   const updateFieldOrder = async (fieldId: string, newOrder: number) => {
     try {
-      const token = localStorage.getItem('authToken');
+      const token = localStorage.getItem('healthcare_portal_token');
       await fetch(`/api/admin/templates/custom-fields/${fieldId}`, {
         method: 'PUT',
         headers: {

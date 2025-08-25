@@ -91,7 +91,7 @@ export function CustomFieldModal({ isOpen, onClose, onSuccess, field }: CustomFi
     setLoading(true);
 
     try {
-      const token = localStorage.getItem('authToken');
+      const token = localStorage.getItem('healthcare_portal_token');
       
       // First create/update the field
       const fieldUrl = isEditing 
