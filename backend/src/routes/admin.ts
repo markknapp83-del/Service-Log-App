@@ -6,6 +6,7 @@ import { validate } from '@/middleware/validation';
 import { authMiddleware, requireRole } from '@/middleware/auth';
 import { asyncHandler } from '@/middleware/errorHandler';
 import { AdminController } from '@/controllers/AdminController';
+import { requireFeature } from '../config/features';
 
 const router = Router();
 const adminController = new AdminController();
@@ -321,6 +322,7 @@ router.get('/templates/custom-fields',
 
 // POST /api/admin/templates/custom-fields - Create new custom field
 router.post('/templates/custom-fields',
+  requireFeature('CUSTOM_FORMS_ENABLED'), // Feature flag protection
   [
     body('fieldLabel')
       .notEmpty()
@@ -514,6 +516,7 @@ router.get('/clients/:clientId/fields',
 
 // POST /api/admin/clients/:clientId/fields - Create client-specific custom field
 router.post('/clients/:clientId/fields',
+  requireFeature('CUSTOM_FORMS_ENABLED'), // Feature flag protection
   [
     param('clientId').isInt({ min: 1 }).withMessage('Invalid client ID'),
     body('fieldLabel')
@@ -555,6 +558,7 @@ router.post('/clients/:clientId/fields',
 
 // PUT /api/admin/clients/:clientId/fields/:fieldId - Update client-specific custom field
 router.put('/clients/:clientId/fields/:fieldId',
+  requireFeature('CUSTOM_FORMS_ENABLED'), // Feature flag protection
   [
     param('clientId').isInt({ min: 1 }).withMessage('Invalid client ID'),
     param('fieldId').isInt({ min: 1 }).withMessage('Invalid field ID'),
@@ -584,6 +588,7 @@ router.put('/clients/:clientId/fields/:fieldId',
 
 // DELETE /api/admin/clients/:clientId/fields/:fieldId - Delete client-specific custom field
 router.delete('/clients/:clientId/fields/:fieldId',
+  requireFeature('CUSTOM_FORMS_ENABLED'), // Feature flag protection
   [
     param('clientId').isInt({ min: 1 }).withMessage('Invalid client ID'),
     param('fieldId').isInt({ min: 1 }).withMessage('Invalid field ID'),

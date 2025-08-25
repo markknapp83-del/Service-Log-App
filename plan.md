@@ -860,11 +860,119 @@ CREATE INDEX idx_custom_fields_client ON custom_fields(client_id);
 
 ---
 
-## Phase 7: Enhanced Data Management & Client-Aware Reporting (Week 7)
+## Phase 6.6: Disable Custom Form Features for Post-Launch (NEW)
+**📚 PRIMARY DOCUMENTATION**: [React 18](./devdocs/react-18.md) + [shadcn/ui](./devdocs/shadcn-ui.md)
+
+### Objectives
+Disable admin access to custom form creation while preserving existing functionality. Prepare custom form features as post-launch capabilities by hiding UI elements and preventing new field creation.
+
+### 🚨 MANDATORY Pre-Phase Steps
+1. **Review [React 18 Documentation](./devdocs/react-18.md)** - Conditional rendering and feature flag patterns
+2. **Study [shadcn/ui Documentation](./devdocs/shadcn-ui.md)** - Button disable states and UI patterns
+3. **Check current implementation** - Understand existing client-specific field ca
+pabilities
+4. **Follow documented UI disable patterns** rather than removing functionality
+
+### Key Changes Required
+
+#### 1. Admin Interface Updates
+**DISABLE without removing functionality:**
+- **"Add New Capture" button** → Grey out and disable in Additional Information section
+- **Client field management** → Hide admin field creation interfaces
+- **Preserve existing client fields** → Keep current database and functionality intact
+- **Admin dashboard updates** → Grey out custom field management sections
+
+#### 2. Service Log Form Simplification
+**MAINTAIN current structure:**
+- **Client dropdown** → Keep existing functionality
+- **Activity/Specialty dropdown** → Keep existing functionality  
+- **Service Date field** → Keep existing functionality
+- **Patient Count** → Keep existing functionality
+- **Patient Entries** → Keep appointment type and outcome selection
+- **Additional Information** → Show only "Additional Notes" textbox (no custom fields)
+- **Summary section** → Keep current appointment-based counting
+
+#### 3. Database Preservation
+**KEEP existing schema but disable new creation:**
+- **Maintain current custom_fields table** → Preserve existing client-specific fields
+- **Disable new field creation** → Prevent admin from adding new fields
+- **Keep existing data** → All current form submissions remain intact
+- **Preserve API endpoints** → Keep functionality for existing fields
+
+### Pre-Phase Test Specifications
+**📖 Follow UI disable testing patterns from documentation:**
+
+#### Component Tests (frontend/tests/DisabledFeatures.test.tsx)
+```typescript
+describe('Disabled Custom Form Features', () => {
+  test('Add New Capture button is disabled for admin users')
+  test('Additional Information shows only Additional Notes textbox')
+  test('Existing client fields are preserved but not editable')
+  test('Admin dashboard custom field sections are greyed out')
+  test('Form submission works with simplified structure')
+  test('No new custom fields can be created')
+})
+```
+
+#### E2E Tests (e2e-tests/simplified-form.spec.ts)
+```typescript
+describe('Simplified Service Log Form', () => {
+  test('candidate sees simplified form with core fields only')
+  test('admin cannot create new custom fields')
+  test('existing functionality remains intact')
+  test('form validates and submits correctly')
+  test('additional information contains only notes field')
+})
+```
+
+### UI Components Updates
+**🚨 FOLLOW DOCUMENTED DISABLE PATTERNS - DO NOT REMOVE FUNCTIONALITY**
+
+1. **ServiceLogForm Simplification** → [React 18 Documentation](./devdocs/react-18.md)
+   - Hide custom field rendering in Additional Information section
+   - Show only "Additional Notes" textarea
+   - Keep existing form structure and validation
+   - Preserve appointment type and outcome functionality
+
+2. **Admin Interface Disabling** → [shadcn/ui Documentation](./devdocs/shadcn-ui.md)
+   - Grey out "Add New Capture" button with disabled state
+   - Add tooltip explaining "Feature available post-launch"
+   - Disable custom field management interfaces
+   - Preserve existing admin functionality for other features
+
+3. **Feature Flag Implementation** → [React 18 Documentation](./devdocs/react-18.md)
+   - Create CUSTOM_FORMS_ENABLED feature flag (set to false)
+   - Use conditional rendering to hide/disable custom form features
+   - Preserve all existing code for easy re-enabling post-launch
+
+### Technical Implementation
+**🚨 Each implementation MUST follow documented patterns:**
+
+1. **Feature Flag Creation** → Use documented environment variable patterns
+2. **UI State Management** → Follow documented conditional rendering patterns from React 18
+3. **Button Disable States** → Copy documented disabled button patterns from shadcn/ui
+4. **Preserve Database Schema** → Keep existing tables and relationships intact
+5. **API Endpoint Disabling** → Add feature flag checks to prevent new field creation
+
+### Success Criteria
+- [x] Phase 6.5 client-specific fields implementation preserved
+- [ ] "Add New Capture" button disabled and greyed out for admin
+- [ ] Additional Information section shows only "Additional Notes" textbox
+- [ ] Service log form maintains current core functionality
+- [ ] Patient entries keep appointment type and outcome selection
+- [ ] Summary section retains appointment-based counting
+- [ ] Existing database schema and data preserved
+- [ ] No new custom fields can be created by admin
+- [ ] All existing functionality works correctly
+- [ ] Feature can be easily re-enabled post-launch
+
+---
+
+## Phase 7: Enhanced Data Management & Reporting (Week 7)
 **📚 PRIMARY DOCUMENTATION**: [SQLite](./devdocs/sqlite-better-sqlite3.md) + [Express.js](./devdocs/express.md) + [React 18](./devdocs/react-18.md)
 
 ### Objectives
-Build comprehensive data viewing using documented query optimization patterns, export functionality, and performance patterns for large datasets. **Enhanced to handle client-specific custom field data in reporting and exports.**
+Build comprehensive data viewing using documented query optimization patterns, export functionality, and performance patterns for large datasets. **Simplified to handle core service log data without custom form complexity.**
 
 ### 🚨 MANDATORY Pre-Phase Steps
 1. **Read [SQLite Documentation](./devdocs/sqlite-better-sqlite3.md)** - Query optimization, indexing, and reporting patterns
@@ -935,8 +1043,8 @@ describe('Reporting API', () => {
 **🚨 Each deliverable MUST follow documented patterns:**
 1. **Submissions interface** → Copy data table patterns from [shadcn/ui Documentation](./devdocs/shadcn-ui.md) with performance optimization
 2. **Advanced filtering** → Use documented filter patterns from React Hook Form with Zod validation
-3. **Export functionality** → Follow documented export patterns from [Express.js Documentation](./devdocs/express.md) with streaming **and client-specific custom field data**
-4. **Summary reports** → Copy documented query optimization patterns from [SQLite Documentation](./devdocs/sqlite-better-sqlite3.md) **with client-aware field aggregation**
+3. **Export functionality** → Follow documented export patterns from [Express.js Documentation](./devdocs/express.md) with streaming for core service log data
+4. **Summary reports** → Copy documented query optimization patterns from [SQLite Documentation](./devdocs/sqlite-better-sqlite3.md) for standard reporting
 5. **Analytics dashboard** → Use documented dashboard layout patterns from shadcn/ui
 6. **Saved searches** → Implement documented persistence patterns from React 18 with proper TypeScript typing
 

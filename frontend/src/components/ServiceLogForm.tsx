@@ -15,6 +15,7 @@ import { useToast } from '../hooks/useToast';
 import { useClientCustomFields } from '../hooks/useClientCustomFields';
 import { useClientFieldManagement } from '../hooks/useClientCustomFields';
 import { useAuth } from '../hooks/useAuth';
+import { checkFeature } from '../config/features';
 import { serviceLogFormSchema, ServiceLogFormData, formatValidationError } from '../utils/validation';
 import { 
   ServiceLogFormProps, 
@@ -41,11 +42,9 @@ export function ServiceLogForm({
   initialData,
   isLoading = false
 }: ServiceLogFormComponentProps) {
-  const [isDraftSaving, setIsDraftSaving] = useState(false);
   const [showCreateFieldModal, setShowCreateFieldModal] = useState(false);
   const { showToast } = useToast();
   const { user } = useAuth();
-  const draftLoadedRef = useRef(false);
 
   const {
     register,
@@ -129,9 +128,6 @@ export function ServiceLogForm({
 
   // Generate patient rows based on patient count
   useEffect(() => {
-    // Don't auto-adjust entries if draft hasn't been loaded yet to prevent interference
-    if (!draftLoadedRef.current) return;
-    
     const currentEntries = watchPatientEntries || [];
     const desiredCount = watchPatientCount || 0;
     
@@ -146,74 +142,16 @@ export function ServiceLogForm({
     }
   }, [watchPatientCount, replace, watchPatientEntries]);
 
-  // Auto-save draft functionality following documented patterns
+  // Draft functionality disabled per user request
+  // Users reported interference with data entry when drafts auto-restore
   useEffect(() => {
-    if (isDirty) {
-      const saveTimer = setTimeout(async () => {
-        const currentData = watch();
-        try {
-          setIsDraftSaving(true);
-          // Save to localStorage as draft
-          localStorage.setItem('serviceLogDraft', JSON.stringify(currentData));
-        } catch (error) {
-          console.error('Failed to save draft:', error);
-        } finally {
-          setIsDraftSaving(false);
-        }
-      }, 2000);
-
-      return () => clearTimeout(saveTimer);
-    }
-    return undefined;
-  }, [watch, isDirty]);
-
-  // Load draft on component mount
-  useEffect(() => {
-    if (draftLoadedRef.current) return; // Prevent multiple loads
-    
-    const loadDraft = () => {
-      try {
-        const draft = localStorage.getItem('serviceLogDraft');
-        if (draft && !initialData) {
-          const draftData = JSON.parse(draft);
-          
-          // Validate draft data has required fields
-          if (draftData.clientId || draftData.activityId || draftData.serviceDate || 
-              (draftData.patientEntries && draftData.patientEntries.length > 0)) {
-            
-            console.log('Loading saved draft data');
-            reset(draftData);
-            
-            showToast({
-              type: 'info',
-              message: 'Draft restored: Your previous work has been recovered.',
-            });
-          } else {
-            // Clear empty draft
-            localStorage.removeItem('serviceLogDraft');
-            console.log('Cleared empty draft data');
-          }
-        }
-      } catch (error) {
-        console.error('Failed to load draft:', error);
-        localStorage.removeItem('serviceLogDraft');
-        showToast({
-          type: 'error',
-          message: 'Failed to restore draft. Starting with fresh form.',
-        });
-      }
-      draftLoadedRef.current = true;
-    };
-
-    loadDraft();
-  }, [reset, initialData, showToast]);
+    // Clear any existing drafts to prevent future interference
+    localStorage.removeItem('serviceLogDraft');
+  }, []);
 
   const handleFormSubmit = async (data: ServiceLogFormData) => {
     try {
       await onSubmit(data);
-      // Clear draft on successful submission
-      localStorage.removeItem('serviceLogDraft');
-      draftLoadedRef.current = false; // Allow draft loading again
       showToast({
         type: 'success',
         message: 'Service log saved: Your service entry has been successfully recorded.',
@@ -236,8 +174,6 @@ export function ServiceLogForm({
       customFields: {},
       additionalNotes: '',
     });
-    localStorage.removeItem('serviceLogDraft');
-    draftLoadedRef.current = false; // Allow draft loading again
     showToast({
       type: 'info',
       message: 'Form cleared: All fields have been reset.',
@@ -278,12 +214,6 @@ export function ServiceLogForm({
       <div className="bg-white rounded-xl shadow-sm border border-neutral-200 p-6">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-2xl font-semibold text-neutral-900">Service Log Entry</h1>
-          {isDraftSaving && (
-            <div className="flex items-center text-sm text-blue-600">
-              <div className="w-2 h-2 bg-blue-400 rounded-full mr-2 animate-pulse" />
-              Auto-saving draft...
-            </div>
-          )}
         </div>
 
         {/* Basic Information */}
@@ -451,8 +381,14 @@ export function ServiceLogForm({
               type="button"
               variant="outline"
               size="sm"
-              onClick={() => setShowCreateFieldModal(true)}
-              className="flex items-center"
+              onClick={() => {
+                if (checkFeature('CUSTOM_FORMS_ENABLED')) {
+                  setShowCreateFieldModal(true);
+                }
+              }}
+              className="flex items-center opacity-50 cursor-not-allowed"
+              disabled={!checkFeature('CUSTOM_FORMS_ENABLED')}
+              title={!checkFeature('CUSTOM_FORMS_ENABLED') ? 'Custom form features available post-launch' : undefined}
             >
               <Plus className="w-4 h-4 mr-2" />
               Add New Capture
@@ -460,8 +396,8 @@ export function ServiceLogForm({
           )}
         </div>
 
-        {/* Client-Specific Custom Fields */}
-        {customFields.length > 0 ? (
+        {/* Client-Specific Custom Fields - Only show if feature is enabled */}
+        {checkFeature('CUSTOM_FORMS_ENABLED') && customFields.length > 0 ? (
           <div className="space-y-6">
             {customFields.map((field) => (
               <div key={field.id} className="space-y-2">
@@ -512,18 +448,18 @@ export function ServiceLogForm({
               </div>
             ))}
           </div>
-        ) : watchClientId ? (
+        ) : checkFeature('CUSTOM_FORMS_ENABLED') && watchClientId ? (
           <div className="text-center py-8 text-neutral-500">
             <p className="text-sm">No additional fields configured for this client.</p>
             {user?.role === 'admin' && (
               <p className="text-xs mt-1">Click "Add New Capture" to create custom fields for this client.</p>
             )}
           </div>
-        ) : (
+        ) : checkFeature('CUSTOM_FORMS_ENABLED') ? (
           <div className="text-center py-8 text-neutral-500">
             <p className="text-sm">Select a client to see additional fields.</p>
           </div>
-        )}
+        ) : null}
 
         {/* Always show Additional Notes field */}
         <div className="mt-6 pt-6 border-t border-neutral-200">
@@ -546,12 +482,6 @@ export function ServiceLogForm({
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pt-6 border-t border-neutral-200 space-y-4 sm:space-y-0">
         <div className="text-sm text-neutral-500">
           <p>* Required fields</p>
-          {isDirty && (
-            <p className="flex items-center mt-1">
-              <div className="w-2 h-2 bg-yellow-400 rounded-full mr-2" />
-              Unsaved changes
-            </p>
-          )}
         </div>
 
         <div className="flex space-x-4">
@@ -590,8 +520,8 @@ export function ServiceLogForm({
         </div>
       </div>
 
-      {/* Client Field Creation Modal */}
-      {user?.role === 'admin' && watchClientId && (
+      {/* Client Field Creation Modal - Only show if feature is enabled */}
+      {checkFeature('CUSTOM_FORMS_ENABLED') && user?.role === 'admin' && watchClientId && (
         <ClientFieldModal
           isOpen={showCreateFieldModal}
           onClose={() => setShowCreateFieldModal(false)}

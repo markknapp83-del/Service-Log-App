@@ -8,6 +8,7 @@ import { Modal } from './Modal';
 import { useClientFieldManagement } from '../hooks/useClientCustomFields';
 import { useToast } from '../hooks/useToast';
 import { CustomFieldWithChoices } from '../services/customFieldApi';
+import { checkFeature } from '../config/features';
 
 interface ClientFieldManagerProps {
   clientId: string;
@@ -136,6 +137,45 @@ export function ClientFieldManager({
           >
             Try Again
           </Button>
+        </div>
+      </Card>
+    );
+  }
+
+  // If custom forms are disabled, show a disabled state
+  if (!checkFeature('CUSTOM_FORMS_ENABLED')) {
+    return (
+      <Card className={`p-6 ${className}`}>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-lg font-medium text-neutral-400">
+              Custom Fields
+            </h2>
+            <p className="text-sm text-neutral-400">
+              Custom form features will be available post-launch
+            </p>
+          </div>
+          <Button
+            type="button"
+            variant="primary"
+            size="sm"
+            disabled
+            className="flex items-center opacity-50 cursor-not-allowed"
+            title="Custom form features available post-launch"
+          >
+            <Plus className="w-4 h-4 mr-2" />
+            Add Field
+          </Button>
+        </div>
+        
+        <div className="text-center py-8">
+          <Settings className="w-12 h-12 text-neutral-200 mx-auto mb-4" />
+          <h3 className="text-sm font-medium text-neutral-400 mb-2">
+            Custom Fields Temporarily Disabled
+          </h3>
+          <p className="text-sm text-neutral-400">
+            Custom form creation will be enabled in a future update.
+          </p>
         </div>
       </Card>
     );
