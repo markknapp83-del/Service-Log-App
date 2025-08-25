@@ -1,19 +1,23 @@
+/* Import professional fonts */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
 
-/* shadcn/ui design tokens */
+/* Modern Healthcare Portal Design System */
 @layer base {
   :root {
-    --background: 0 0% 100%;
+    /* Core shadcn/ui design tokens - Enhanced */
+    --background: 0 0% 99%;
     --foreground: 222.2 84% 4.9%;
     --card: 0 0% 100%;
     --card-foreground: 222.2 84% 4.9%;
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
-    --primary: 221.2 83.2% 53.3%;
+    --primary: 217 91% 60%;
     --primary-foreground: 210 40% 98%;
-    --secondary: 210 40% 96%;
+    --secondary: 214 32% 91%;
     --secondary-foreground: 222.2 84% 4.9%;
     --muted: 210 40% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
@@ -23,73 +27,472 @@
     --destructive-foreground: 210 40% 98%;
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 221.2 83.2% 53.3%;
-    --radius: 0.5rem;
+    --ring: 217 91% 60%;
+    --radius: 0.75rem;
     
-    /* Healthcare-specific colors */
-    --healthcare-primary: #2563eb;
-    --healthcare-secondary: #64748b;
-    --healthcare-accent: #10b981;
-    --healthcare-error: #ef4444;
-    --healthcare-warning: #f59e0b;
-    --healthcare-success: #10b981;
-    --healthcare-background: #f8fafc;
-    --healthcare-surface: #ffffff;
-    --healthcare-text-primary: #1e293b;
-    --healthcare-text-secondary: #64748b;
+    /* Modern Healthcare Color Palette */
+    --healthcare-primary: 217 91% 60%;
+    --healthcare-primary-50: 219 100% 96%;
+    --healthcare-primary-100: 218 94% 92%;
+    --healthcare-primary-200: 218 87% 84%;
+    --healthcare-primary-300: 218 85% 75%;
+    --healthcare-primary-400: 218 84% 65%;
+    --healthcare-primary-500: 217 91% 60%;
+    --healthcare-primary-600: 217 100% 54%;
+    --healthcare-primary-700: 216 96% 48%;
+    --healthcare-primary-800: 216 94% 39%;
+    --healthcare-primary-900: 215 92% 31%;
+    --healthcare-primary-950: 215 87% 19%;
+    
+    /* Sophisticated Secondary Colors */
+    --healthcare-secondary: 215 16% 47%;
+    --healthcare-secondary-50: 210 40% 98%;
+    --healthcare-secondary-100: 210 40% 95%;
+    --healthcare-secondary-200: 214 32% 91%;
+    --healthcare-secondary-300: 213 27% 84%;
+    --healthcare-secondary-400: 215 20% 65%;
+    --healthcare-secondary-500: 215 16% 47%;
+    --healthcare-secondary-600: 215 19% 35%;
+    --healthcare-secondary-700: 215 25% 27%;
+    --healthcare-secondary-800: 217 33% 17%;
+    --healthcare-secondary-900: 222 47% 11%;
+    --healthcare-secondary-950: 229 84% 5%;
+    
+    /* Warm Accent Colors */
+    --healthcare-accent: 159 64% 52%;
+    --healthcare-accent-warm: 37 77% 58%;
+    --healthcare-success: 142 71% 45%;
+    --healthcare-warning: 43 96% 56%;
+    --healthcare-error: 0 84% 60%;
+    --healthcare-info: 199 89% 48%;
+    
+    /* Surface & Background Enhancements */
+    --healthcare-background: 210 40% 98%;
+    --healthcare-surface: 0 0% 100%;
+    --healthcare-surface-elevated: 210 40% 99%;
+    --healthcare-surface-overlay: 0 0% 100%;
+    
+    /* Text & Content */
+    --healthcare-text-primary: 222 84% 5%;
+    --healthcare-text-secondary: 215 16% 47%;
+    --healthcare-text-muted: 215 20% 65%;
+    --healthcare-text-disabled: 214 32% 91%;
+    
+    /* Interactive States */
+    --healthcare-hover: 210 40% 95%;
+    --healthcare-active: 214 32% 91%;
+    --healthcare-focus: 217 91% 60%;
+    --healthcare-selected: 219 100% 96%;
+    
+    /* Shadows & Elevation */
+    --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+    --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+    --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+    --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+    --shadow-inner: inset 0 2px 4px 0 rgb(0 0 0 / 0.05);
+    
+    /* Border Radius System */
+    --radius-xs: 0.25rem;
+    --radius-sm: 0.375rem;
+    --radius-md: 0.5rem;
+    --radius-lg: 0.75rem;
+    --radius-xl: 1rem;
+    --radius-2xl: 1.5rem;
+    --radius-3xl: 2rem;
+    --radius-full: 9999px;
+    
+    /* Spacing System Enhancement */
+    --space-px: 1px;
+    --space-0: 0px;
+    --space-0-5: 0.125rem;
+    --space-1: 0.25rem;
+    --space-1-5: 0.375rem;
+    --space-2: 0.5rem;
+    --space-2-5: 0.625rem;
+    --space-3: 0.75rem;
+    --space-3-5: 0.875rem;
+    --space-4: 1rem;
+    --space-5: 1.25rem;
+    --space-6: 1.5rem;
+    --space-7: 1.75rem;
+    --space-8: 2rem;
+    --space-10: 2.5rem;
+    --space-12: 3rem;
+    --space-16: 4rem;
+    --space-20: 5rem;
+    --space-24: 6rem;
+    --space-32: 8rem;
+    --space-40: 10rem;
+    --space-48: 12rem;
+    --space-56: 14rem;
+    --space-64: 16rem;
+    
+    /* Typography System */
+    --font-family-sans: 'Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'Helvetica Neue', 'Arial', 'sans-serif';
+    --font-family-display: 'Outfit', 'Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif';
+    --font-family-mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 'monospace';
+    
+    /* Font Weights */
+    --font-weight-light: 300;
+    --font-weight-normal: 400;
+    --font-weight-medium: 500;
+    --font-weight-semibold: 600;
+    --font-weight-bold: 700;
+    --font-weight-extrabold: 800;
+    
+    /* Line Heights */
+    --line-height-none: 1;
+    --line-height-tight: 1.25;
+    --line-height-snug: 1.375;
+    --line-height-normal: 1.5;
+    --line-height-relaxed: 1.625;
+    --line-height-loose: 2;
+    
+    /* Letter Spacing */
+    --letter-spacing-tighter: -0.05em;
+    --letter-spacing-tight: -0.025em;
+    --letter-spacing-normal: 0em;
+    --letter-spacing-wide: 0.025em;
+    --letter-spacing-wider: 0.05em;
+    --letter-spacing-widest: 0.1em;
+    
+    /* Animation & Transitions */
+    --transition-none: none;
+    --transition-all: all 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-default: 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-colors: color 150ms cubic-bezier(0.4, 0, 0.2, 1), background-color 150ms cubic-bezier(0.4, 0, 0.2, 1), border-color 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-opacity: opacity 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-shadow: box-shadow 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    --transition-transform: transform 150ms cubic-bezier(0.4, 0, 0.2, 1);
+    
+    /* Animation Durations */
+    --duration-75: 75ms;
+    --duration-100: 100ms;
+    --duration-150: 150ms;
+    --duration-200: 200ms;
+    --duration-300: 300ms;
+    --duration-500: 500ms;
+    --duration-700: 700ms;
+    --duration-1000: 1000ms;
+    
+    /* Animation Timing Functions */
+    --ease-linear: linear;
+    --ease-in: cubic-bezier(0.4, 0, 1, 1);
+    --ease-out: cubic-bezier(0, 0, 0.2, 1);
+    --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
+    /* Enhanced Dark Mode Theme */
+    --background: 222 84% 5%;
     --foreground: 210 40% 98%;
-    --card: 222.2 84% 4.9%;
+    --card: 217 33% 8%;
     --card-foreground: 210 40% 98%;
-    --popover: 222.2 84% 4.9%;
+    --popover: 217 33% 8%;
     --popover-foreground: 210 40% 98%;
-    --primary: 217.2 91.2% 59.8%;
-    --primary-foreground: 222.2 84% 4.9%;
-    --secondary: 217.2 32.6% 17.5%;
+    --primary: 217 91% 65%;
+    --primary-foreground: 222 84% 5%;
+    --secondary: 217 33% 15%;
     --secondary-foreground: 210 40% 98%;
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
-    --accent: 217.2 32.6% 17.5%;
+    --muted: 217 33% 15%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 15%;
     --accent-foreground: 210 40% 98%;
-    --destructive: 0 62.8% 30.6%;
+    --destructive: 0 63% 45%;
     --destructive-foreground: 210 40% 98%;
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 224.3 76.3% 94.1%;
+    --border: 217 33% 15%;
+    --input: 217 33% 15%;
+    --ring: 217 91% 65%;
+    
+    /* Dark Mode Healthcare Colors */
+    --healthcare-background: 222 84% 5%;
+    --healthcare-surface: 217 33% 8%;
+    --healthcare-surface-elevated: 217 33% 12%;
+    --healthcare-text-primary: 210 40% 98%;
+    --healthcare-text-secondary: 215 20% 65%;
+    --healthcare-text-muted: 217 33% 50%;
+    --healthcare-hover: 217 33% 15%;
+    --healthcare-active: 217 33% 20%;
   }
-}
-
+  
+  /* Global Base Styles */
   * {
     @apply border-border;
   }
   
+  html {
+    font-family: var(--font-family-sans);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+  
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: var(--font-family-sans);
+    font-weight: var(--font-weight-normal);
+    line-height: var(--line-height-normal);
+    letter-spacing: var(--letter-spacing-normal);
+    font-feature-settings: "rlig" 1, "calt" 1, "kern" 1;
+    font-variant-numeric: tabular-nums;
   }
+  
+  /* Typography Enhancements */
+  h1, h2, h3, h4, h5, h6 {
+    font-family: var(--font-family-display);
+    font-weight: var(--font-weight-semibold);
+    line-height: var(--line-height-tight);
+    letter-spacing: var(--letter-spacing-tight);
+    color: hsl(var(--healthcare-text-primary));
+  }
+  
+  h1 {
+    font-size: 2.5rem;
+    font-weight: var(--font-weight-bold);
+  }
+  
+  h2 {
+    font-size: 2rem;
+    font-weight: var(--font-weight-bold);
+  }
+  
+  h3 {
+    font-size: 1.5rem;
+    font-weight: var(--font-weight-semibold);
+  }
+  
+  h4 {
+    font-size: 1.25rem;
+    font-weight: var(--font-weight-semibold);
+  }
+  
+  p {
+    color: hsl(var(--healthcare-text-secondary));
+    line-height: var(--line-height-relaxed);
+  }
+  
+  /* Focus Ring Enhancement */
+  *:focus-visible {
+    outline: 2px solid hsl(var(--healthcare-focus));
+    outline-offset: 2px;
+    border-radius: var(--radius-sm);
+  }
+}
 
-/* Component styles */
+/* Enhanced Component Styles */
 @layer components {
+  /* Modern Button Styles */
   .btn-primary {
-    @apply bg-blue-600 hover:bg-blue-700 text-white font-medium py-2 px-4 rounded-lg transition-colors;
+    @apply bg-primary hover:bg-primary/90 active:bg-primary/80 text-primary-foreground font-medium py-3 px-6 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md transform hover:scale-[1.02] active:scale-[0.98];
   }
   
   .btn-secondary {
-    @apply bg-gray-100 hover:bg-gray-200 text-gray-900 font-medium py-2 px-4 rounded-lg transition-colors;
+    @apply bg-secondary hover:bg-secondary/80 active:bg-secondary/70 text-secondary-foreground font-medium py-3 px-6 rounded-xl transition-all duration-200 shadow-sm hover:shadow-md border border-border;
   }
   
+  .btn-outline {
+    @apply bg-transparent hover:bg-accent text-foreground font-medium py-3 px-6 rounded-xl transition-all duration-200 border border-border hover:border-primary/20 shadow-sm hover:shadow-md;
+  }
+  
+  .btn-ghost {
+    @apply bg-transparent hover:bg-accent text-foreground font-medium py-3 px-6 rounded-xl transition-all duration-200;
+  }
+  
+  /* Enhanced Form Inputs */
   .input-field {
-    @apply block w-full px-3 py-2 border border-gray-300 rounded-lg shadow-sm placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500;
+    @apply block w-full px-4 py-3 border border-input bg-background rounded-xl shadow-sm placeholder-muted-foreground transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary/50 hover:border-primary/30;
   }
   
+  .input-field:focus {
+    @apply shadow-md;
+  }
+  
+  /* Modern Select Styles */
+  .select-field {
+    @apply block w-full px-4 py-3 border border-input bg-background rounded-xl shadow-sm transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary/50 hover:border-primary/30;
+  }
+  
+  /* Enhanced Error States */
   .form-error {
-    @apply text-red-600 text-sm mt-1;
+    @apply text-destructive text-sm mt-2 font-medium;
   }
   
+  .input-error {
+    @apply border-destructive focus:border-destructive focus:ring-destructive;
+  }
+  
+  /* Modern Card Styles */
   .card {
-    @apply bg-white rounded-lg shadow-sm border border-gray-200 p-6;
+    @apply bg-card rounded-2xl shadow-md border border-border p-6 transition-all duration-200 hover:shadow-lg;
+  }
+  
+  .card-elevated {
+    @apply bg-card rounded-2xl shadow-lg border border-border p-6 transition-all duration-200 hover:shadow-xl;
+  }
+  
+  .card-interactive {
+    @apply bg-card rounded-2xl shadow-md border border-border p-6 transition-all duration-200 hover:shadow-lg hover:border-primary/20 cursor-pointer transform hover:scale-[1.01];
+  }
+  
+  /* Status Badges */
+  .badge {
+    @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-medium;
+  }
+  
+  .badge-success {
+    @apply bg-green-100 text-green-800 border border-green-200;
+  }
+  
+  .badge-warning {
+    @apply bg-yellow-100 text-yellow-800 border border-yellow-200;
+  }
+  
+  .badge-error {
+    @apply bg-red-100 text-red-800 border border-red-200;
+  }
+  
+  .badge-info {
+    @apply bg-blue-100 text-blue-800 border border-blue-200;
+  }
+  
+  .badge-primary {
+    @apply bg-primary/10 text-primary border border-primary/20;
+  }
+  
+  .badge-secondary {
+    @apply bg-secondary text-secondary-foreground border border-border;
+  }
+  
+  /* Loading States */
+  .loading-spinner {
+    @apply animate-spin rounded-full border-2 border-muted border-t-primary;
+  }
+  
+  .loading-skeleton {
+    @apply animate-pulse bg-muted rounded;
+  }
+  
+  /* Scrollbar Styling */
+  .scrollbar-modern {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted)) hsl(var(--background));
+  }
+  
+  .scrollbar-modern::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  
+  .scrollbar-modern::-webkit-scrollbar-track {
+    background: hsl(var(--background));
+  }
+  
+  .scrollbar-modern::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: var(--radius-full);
+  }
+  
+  .scrollbar-modern::-webkit-scrollbar-thumb:hover {
+    background: hsl(var(--muted-foreground));
+  }
+  
+  /* Animation Classes */
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-in-out;
+  }
+  
+  .animate-slide-up {
+    animation: slideUp 0.3s ease-out;
+  }
+  
+  .animate-slide-down {
+    animation: slideDown 0.3s ease-out;
+  }
+  
+  .animate-scale-in {
+    animation: scaleIn 0.2s ease-out;
+  }
+  
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+  
+  @keyframes slideUp {
+    from {
+      transform: translateY(10px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes slideDown {
+    from {
+      transform: translateY(-10px);
+      opacity: 0;
+    }
+    to {
+      transform: translateY(0);
+      opacity: 1;
+    }
+  }
+  
+  @keyframes scaleIn {
+    from {
+      transform: scale(0.95);
+      opacity: 0;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+  
+  /* Utility Classes */
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .gradient-primary {
+    background: linear-gradient(135deg, hsl(var(--primary)) 0%, hsl(var(--healthcare-accent)) 100%);
+  }
+  
+  .gradient-secondary {
+    background: linear-gradient(135deg, hsl(var(--secondary)) 0%, hsl(var(--muted)) 100%);
+  }
+  
+  .surface-blur {
+    backdrop-filter: blur(8px);
+    background: hsl(var(--background) / 0.8);
+  }
+  
+  /* Healthcare Specific Utilities */
+  .status-indicator {
+    @apply w-3 h-3 rounded-full;
+  }
+  
+  .status-active {
+    @apply bg-green-500 shadow-sm shadow-green-500/25;
+  }
+  
+  .status-inactive {
+    @apply bg-gray-400 shadow-sm;
+  }
+  
+  .status-warning {
+    @apply bg-yellow-500 shadow-sm shadow-yellow-500/25;
+  }
+  
+  .status-error {
+    @apply bg-red-500 shadow-sm shadow-red-500/25;
   }
 }

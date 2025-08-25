@@ -78,12 +78,17 @@ async function createApp() {
 
   // Additional security headers
   app.use(securityHeaders);
-  // Enhanced CORS configuration
+  // Enhanced CORS configuration with ngrok support for demos
   app.use(cors({
     origin: process.env.NODE_ENV === 'development' 
       ? (origin, callback) => {
-          // Allow any localhost origin in development
-          if (!origin || origin.startsWith('http://localhost:') || origin.startsWith('https://localhost:')) {
+          // Allow localhost origins and ngrok tunnels in development
+          if (!origin || 
+              origin.startsWith('http://localhost:') || 
+              origin.startsWith('https://localhost:') ||
+              origin.includes('ngrok-free.app') ||
+              origin.includes('ngrok.app') ||
+              origin.includes('ngrok.io')) {
             callback(null, true);
           } else {
             HIPAALogger.warn('CORS: Blocked unauthorized origin', { origin });
@@ -93,7 +98,15 @@ async function createApp() {
       : (origin, callback) => {
           const corsOrigin = process.env.CORS_ORIGIN || 'http://localhost:3000';
           const allowedOrigins = typeof corsOrigin === 'string' ? corsOrigin.split(',') : ['http://localhost:3000'];
-          if (!origin || allowedOrigins.includes(origin)) {
+          
+          // Also allow ngrok domains in production for demos
+          const isNgrokDomain = origin && (
+            origin.includes('ngrok-free.app') ||
+            origin.includes('ngrok.app') ||
+            origin.includes('ngrok.io')
+          );
+          
+          if (!origin || allowedOrigins.includes(origin) || isNgrokDomain) {
             callback(null, true);
           } else {
             HIPAALogger.warn('CORS: Production origin blocked', { origin, allowedOrigins });
