@@ -1,0 +1,50 @@
+# Healthcare Service Log Portal - Persistent Volume Claims
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: healthcare-portal-db-pvc
+  namespace: healthcare-portal
+  labels:
+    app: healthcare-portal
+    type: database
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 50Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: healthcare-portal-logs-pvc
+  namespace: healthcare-portal
+  labels:
+    app: healthcare-portal
+    type: logs
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 20Gi
+  storageClassName: standard
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: healthcare-portal-uploads-pvc
+  namespace: healthcare-portal
+  labels:
+    app: healthcare-portal
+    type: uploads
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard

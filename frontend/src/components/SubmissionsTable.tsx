@@ -1,5 +1,5 @@
-// Submissions Table component following shadcn/ui data table patterns
-import React, { useState, useMemo, useCallback, memo, startTransition } from 'react';
+// Submissions Table component following shadcn/ui data table patterns with performance optimizations
+import React, { useState, useMemo, useCallback, memo, startTransition, useRef, useEffect } from 'react';
 import { ServiceLog, Client, Activity, User, AppointmentType } from '../types';
 import { Button } from './Button';
 import { Select } from './Select';
@@ -50,18 +50,129 @@ interface SortState {
   direction: SortDirection;
 }
 
-export function SubmissionsTable({ 
+// Debounce hook for search input
+function useDebounce<T>(value: T, delay: number): T {
+  const [debouncedValue, setDebouncedValue] = useState<T>(value);
+  
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedValue(value);
+    }, delay);
+    
+    return () => clearTimeout(timer);
+  }, [value, delay]);
+  
+  return debouncedValue;
+}
+
+// Memoized table row component
+interface TableRowProps {
+  submission: SubmissionTableRow;
+  onViewDetails: (id: string) => void;
+  formatDate: (date: string) => string;
+  formatDateTime: (date: string) => string;
+}
+
+const TableRow = memo<TableRowProps>(({ submission, onViewDetails, formatDate, formatDateTime }) => (
+  <tr key={submission.id} className="hover:bg-gray-50">
+    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+      {formatDate(submission.serviceDate)}
+    </td>
+    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+      {submission.userName}
+    </td>
+    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+      {submission.clientName}
+    </td>
+    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+      {submission.activityName}
+    </td>
+    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+      {submission.totalPatients}
+    </td>
+    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+      <div className="space-y-1">
+        <div className="text-xs">New: {submission.newPatients}</div>
+        <div className="text-xs">Follow-up: {submission.followupPatients}</div>
+        <div className="text-xs">DNA: {submission.dnaPatients}</div>
+      </div>
+    </td>
+    <td className="px-6 py-4 whitespace-nowrap">
+      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+        submission.isDraft 
+          ? 'bg-yellow-100 text-yellow-800' 
+          : 'bg-green-100 text-green-800'
+      }`}>
+        {submission.isDraft ? 'Draft' : 'Submitted'}
+      </span>
+    </td>
+    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+      {submission.submittedAt ? formatDateTime(submission.submittedAt) : '-'}
+    </td>
+    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={() => onViewDetails(submission.id)}
+      >
+        View Details
+      </Button>
+    </td>
+  </tr>
+));
+
+TableRow.displayName = 'TableRow';
+
+export const SubmissionsTable = memo<SubmissionsTableProps>(({ 
   submissions, 
   loading = false, 
   onViewDetails,
   onExport,
   onFilterChange 
-}: SubmissionsTableProps) {
+}) => {
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(20);
   const [sortState, setSortState] = useState<SortState>({ field: 'submittedAt', direction: 'desc' });
   const [filters, setFilters] = useState<SubmissionFilters>({});
   const [showFilters, setShowFilters] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
+  
+  // Debounced search term to prevent excessive filtering
+  const debouncedSearchTerm = useDebounce(searchTerm, 300);
+  
+  // Refs for performance tracking
+  const renderStartTime = useRef<number>(Date.now());
+  const tableContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Track render performance in development
+  useEffect(() => {
+    if (process.env.NODE_ENV === 'development') {
+      const renderTime = Date.now() - renderStartTime.current;
+      if (renderTime > 100) {
+        console.warn(`SubmissionsTable render took ${renderTime}ms`);
+      }
+    }
+    renderStartTime.current = Date.now();
+  });
+
+  // Memoized date formatters to prevent recreation on every render
+  const formatDate = useCallback((dateString: string) => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
+  }, []);
+
+  const formatDateTime = useCallback((dateString: string) => {
+    return new Date(dateString).toLocaleString('en-US', {
+      year: 'numeric',
+      month: 'short', 
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+  }, []);
 
   // Filter and sort submissions with React 18 performance optimizations
   const filteredAndSortedSubmissions = useMemo(() => {
@@ -72,11 +183,13 @@ export function SubmissionsTable({
 
     let filtered = submissions;
 
-    // Optimized filtering with early returns and efficient string operations
-    if (filters.searchTerm) {
-      const searchLower = filters.searchTerm.toLowerCase().trim();
+    // Use debounced search term for better performance
+    const effectiveSearchTerm = filters.searchTerm || debouncedSearchTerm;
+    if (effectiveSearchTerm) {
+      const searchLower = effectiveSearchTerm.toLowerCase().trim();
       if (searchLower.length > 0) {
         filtered = filtered.filter(sub => {
+          // Use includes for better performance than regex
           return (
             sub.userName.toLowerCase().includes(searchLower) ||
             sub.clientName.toLowerCase().includes(searchLower) ||
@@ -140,7 +253,7 @@ export function SubmissionsTable({
     }
 
     return filtered;
-  }, [submissions, filters, sortState]);
+  }, [submissions, filters, sortState, debouncedSearchTerm]);
 
   // Pagination
   const totalPages = Math.ceil(filteredAndSortedSubmissions.length / pageSize);
@@ -159,7 +272,7 @@ export function SubmissionsTable({
     });
   }, []);
 
-  // Handle filter changes with React 18 concurrent features
+  // Handle filter changes with React 18 concurrent features and performance optimizations
   const handleFilterChange = useCallback((newFilters: Partial<SubmissionFilters>) => {
     startTransition(() => {
       const updatedFilters = { ...filters, ...newFilters };
@@ -169,6 +282,15 @@ export function SubmissionsTable({
     });
   }, [filters, onFilterChange]);
 
+  // Optimized search handler with immediate local update
+  const handleSearchChange = useCallback((value: string) => {
+    setSearchTerm(value);
+    // Update filters with debounced value
+    startTransition(() => {
+      handleFilterChange({ searchTerm: value });
+    });
+  }, [handleFilterChange]);
+
   // Clear filters
   const clearFilters = useCallback(() => {
     const emptyFilters = {};
@@ -176,26 +298,6 @@ export function SubmissionsTable({
     setCurrentPage(1);
     onFilterChange?.(emptyFilters);
   }, [onFilterChange]);
-
-  // Format date for display
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
-
-  // Format datetime for display
-  const formatDateTime = (dateString: string) => {
-    return new Date(dateString).toLocaleString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
-    });
-  };
 
   // Generate sort indicator
   const getSortIndicator = (field: SortField) => {
@@ -257,8 +359,8 @@ export function SubmissionsTable({
               <Input
                 type="text"
                 placeholder="User, client, or activity..."
-                value={filters.searchTerm || ''}
-                onChange={(e) => handleFilterChange({ searchTerm: e.target.value })}
+                value={searchTerm}
+                onChange={(e) => handleSearchChange(e.target.value)}
                 className="w-full"
               />
             </div>
@@ -345,7 +447,7 @@ export function SubmissionsTable({
         )}
 
         {!loading && paginatedSubmissions.length > 0 && (
-          <div className="overflow-x-auto">
+          <div className="overflow-x-auto" ref={tableContainerRef}>
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
@@ -395,51 +497,13 @@ export function SubmissionsTable({
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {paginatedSubmissions.map((submission) => (
-                  <tr key={submission.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {formatDate(submission.serviceDate)}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {submission.userName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {submission.clientName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                      {submission.activityName}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                      {submission.totalPatients}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      <div className="space-y-1">
-                        <div className="text-xs">New: {submission.newPatients}</div>
-                        <div className="text-xs">Follow-up: {submission.followupPatients}</div>
-                        <div className="text-xs">DNA: {submission.dnaPatients}</div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                        submission.isDraft 
-                          ? 'bg-yellow-100 text-yellow-800' 
-                          : 'bg-green-100 text-green-800'
-                      }`}>
-                        {submission.isDraft ? 'Draft' : 'Submitted'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                      {submission.submittedAt ? formatDateTime(submission.submittedAt) : '-'}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => onViewDetails(submission.id)}
-                      >
-                        View Details
-                      </Button>
-                    </td>
-                  </tr>
+                  <TableRow
+                    key={submission.id}
+                    submission={submission}
+                    onViewDetails={onViewDetails}
+                    formatDate={formatDate}
+                    formatDateTime={formatDateTime}
+                  />
                 ))}
               </tbody>
             </table>
@@ -530,4 +594,6 @@ export function SubmissionsTable({
       )}
     </div>
   );
-}
+});
+
+SubmissionsTable.displayName = 'SubmissionsTable';

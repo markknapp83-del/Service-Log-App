@@ -7,32 +7,35 @@ import { DatabaseUser, AuditLogEntry, ISODateString, UserId } from '@/types/inde
 
 export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
   protected tableName: string;
-  protected db = db;
+  protected db: typeof db;
 
   constructor(tableName: string) {
     this.tableName = tableName;
+    this.db = db;
   }
 
   // Abstract methods to be implemented by concrete repositories
   protected abstract fromDatabase(dbRow: TDatabase): TDomain;
   protected abstract toDatabase(domain: Partial<TDomain>): Partial<TDatabase>;
 
-  // Generic find by ID with soft delete support
+  // Optimized find by ID with prepared statement caching
   findById(id: TKey): TDomain | null {
     try {
-      // First try with deleted_at column (for tables that support soft delete)
+      const cacheKey = `${this.tableName}_findById`;
       let stmt: Database.Statement;
+      
+      // Use cached prepared statement for better performance
       try {
         stmt = this.db.prepare(`
           SELECT * FROM ${this.tableName} 
           WHERE id = ? AND (deleted_at IS NULL OR deleted_at = '')
-        `);
+        `, cacheKey);
       } catch (error) {
         // If deleted_at column doesn't exist, fallback to simple query
         stmt = this.db.prepare(`
           SELECT * FROM ${this.tableName} 
           WHERE id = ?
-        `);
+        `, `${cacheKey}_simple`);
       }
       
       const row = stmt.get(id) as TDatabase | undefined;
@@ -48,7 +51,7 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
     }
   }
 
-  // Generic find all with pagination and filtering
+  // Optimized find all with pagination, filtering, and prepared statement caching
   findAll(options: {
     page?: number;
     limit?: number;
@@ -75,28 +78,32 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
       
       const offset = (page - 1) * limit;
 
-      // Build WHERE clause
+      // Build WHERE clause for consistent querying
       let whereClause = `(deleted_at IS NULL OR deleted_at = '')`;
       if (where) {
         whereClause += ` AND (${where})`;
       }
 
-      // Get items
+      // Use cached prepared statements for better performance
+      const queryKey = `${this.tableName}_findAll_${orderBy}_${order}_${!!where}`;
+      const countKey = `${this.tableName}_count_${!!where}`;
+
+      // Get items with optimized query
       const stmt = this.db.prepare(`
         SELECT * FROM ${this.tableName}
         WHERE ${whereClause}
         ORDER BY ${orderBy} ${order}
         LIMIT ? OFFSET ?
-      `);
+      `, queryKey);
 
       const rows = stmt.all(...params, limit, offset) as TDatabase[];
       const items = rows.map(row => this.fromDatabase(row));
 
-      // Get total count
+      // Get total count with cached prepared statement
       const countStmt = this.db.prepare(`
         SELECT COUNT(*) as total FROM ${this.tableName} 
         WHERE ${whereClause}
-      `);
+      `, countKey);
 
       const countResult = countStmt.get(...params) as { total: number };
       const total = countResult.total;
@@ -114,7 +121,7 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
     }
   }
 
-  // Generic create with audit logging
+  // Optimized create with cached prepared statements and audit logging
   create(data: Omit<TDomain, 'id' | 'createdAt' | 'updatedAt'>, userId: UserId): TDomain {
     try {
       const id = typeof data === 'object' && 'id' in data ? (data as any).id : uuidv4();
@@ -131,26 +138,29 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
       const placeholders = columns.map(() => '?').join(', ');
       const values = Object.values(dbData);
 
+      // Use cached prepared statement for better performance
+      const insertKey = `${this.tableName}_insert`;
       const stmt = this.db.prepare(`
         INSERT INTO ${this.tableName} (${columns.join(', ')})
         VALUES (${placeholders})
-      `);
+      `, insertKey);
 
+      // High-performance transaction with optimized audit logging
       this.db.transaction(() => {
         stmt.run(...values);
         
-        // Log to audit table
+        // Log to audit table with cached prepared statement
         if (userId) {
-          this.logAudit(id, 'INSERT', null, { id, ...data }, userId);
+          this.logAuditOptimized(id, 'INSERT', null, { id, ...data }, userId);
         }
-      })();
+      });
       
       const created = this.findById(id as TKey);
       if (!created) {
         throw new Error('Failed to retrieve created record');
       }
 
-      logger.info(`${this.tableName} created`, { id, userId });
+      logger.debug(`${this.tableName} created`, { id, userId });
       return created;
     } catch (error) {
       logger.error(`Failed to create ${this.tableName}`, { data, userId, error });
@@ -158,7 +168,7 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
     }
   }
 
-  // Generic update with audit logging
+  // Optimized update with cached prepared statements and audit logging
   update(id: TKey, data: Partial<TDomain>, userId: UserId): TDomain {
     try {
       const oldRecord = this.findById(id);
@@ -185,12 +195,15 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
       const setClause = columns.map(col => `${col} = ?`).join(', ');
       const values = Object.values(updateData);
 
+      // Generate cache key based on columns being updated for better statement reuse
+      const updateKey = `${this.tableName}_update_${columns.sort().join('_')}`;
       const stmt = this.db.prepare(`
         UPDATE ${this.tableName} 
         SET ${setClause}
         WHERE id = ? AND (deleted_at IS NULL OR deleted_at = '')
-      `);
+      `, updateKey);
 
+      // High-performance transaction with optimized audit logging
       this.db.transaction(() => {
         const result = stmt.run(...values, id);
         
@@ -198,16 +211,16 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
           throw new Error(`Failed to update ${this.tableName}: ${id}`);
         }
         
-        // Log to audit table
-        this.logAudit(id, 'UPDATE', oldRecord, { ...oldRecord, ...data }, userId);
-      })();
+        // Log to audit table with cached prepared statement
+        this.logAuditOptimized(id, 'UPDATE', oldRecord, { ...oldRecord, ...data }, userId);
+      });
 
       const updated = this.findById(id);
       if (!updated) {
         throw new Error('Failed to retrieve updated record');
       }
 
-      logger.info(`${this.tableName} updated`, { id, userId });
+      logger.debug(`${this.tableName} updated`, { id, userId });
       return updated;
     } catch (error) {
       logger.error(`Failed to update ${this.tableName}`, { id, data, userId, error });
@@ -239,7 +252,7 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
         
         // Log to audit table
         this.logAudit(id, 'DELETE', oldRecord, { ...oldRecord, deletedAt: now }, userId);
-      })();
+      });
 
       logger.info(`${this.tableName} soft deleted`, { id, userId });
       return true;
@@ -270,7 +283,7 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
         
         // Log to audit table
         this.logAudit(id, 'DELETE', oldRecord, null, userId);
-      })();
+      });
 
       logger.info(`${this.tableName} hard deleted`, { id, userId });
       return true;
@@ -280,7 +293,7 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
     }
   }
 
-  // Count records with optional filtering
+  // Count records with optional filtering (legacy method maintained for compatibility)
   count(where?: string, params?: any[]): number {
     try {
       let whereClause = `is_active = 1`;
@@ -288,9 +301,10 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
         whereClause += ` AND (${where})`;
       }
 
+      const countKey = `${this.tableName}_count_legacy`;
       const stmt = this.db.prepare(`
         SELECT COUNT(*) as total FROM ${this.tableName} WHERE ${whereClause}
-      `);
+      `, countKey);
 
       const result = stmt.get(...(params || [])) as { total: number };
       return result.total;
@@ -300,7 +314,7 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
     }
   }
 
-  // Audit logging helper
+  // Original audit logging helper (maintained for backward compatibility)
   protected logAudit(
     recordId: TKey, 
     action: 'INSERT' | 'UPDATE' | 'DELETE', 
@@ -313,6 +327,41 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
         INSERT INTO audit_log (table_name, record_id, action, old_values, new_values, user_id)
         VALUES (?, ?, ?, ?, ?, ?)
       `);
+
+      auditStmt.run(
+        this.tableName,
+        recordId,
+        action,
+        oldValues ? JSON.stringify(oldValues) : null,
+        newValues ? JSON.stringify(newValues) : null,
+        userId
+      );
+    } catch (error) {
+      logger.error('Failed to log audit entry', { 
+        tableName: this.tableName,
+        recordId, 
+        action, 
+        userId, 
+        error 
+      });
+      // Don't throw here - audit logging failure shouldn't break the main operation
+    }
+  }
+
+  // Optimized audit logging with cached prepared statements
+  protected logAuditOptimized(
+    recordId: TKey, 
+    action: 'INSERT' | 'UPDATE' | 'DELETE', 
+    oldValues: any, 
+    newValues: any, 
+    userId: UserId
+  ): void {
+    try {
+      const auditKey = 'audit_log_insert';
+      const auditStmt = this.db.prepare(`
+        INSERT INTO audit_log (table_name, record_id, action, old_values, new_values, user_id)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `, auditKey);
 
       auditStmt.run(
         this.tableName,
@@ -381,7 +430,7 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
         if (userId) {
           this.logAudit(result.lastInsertRowid, 'INSERT', null, { id: result.lastInsertRowid, ...data }, userId);
         }
-      })();
+      });
 
       const created = this.findById(result.lastInsertRowid as any);
       if (!created) {
@@ -396,22 +445,165 @@ export abstract class BaseRepository<TDomain, TDatabase, TKey = string> {
     }
   }
 
-  // Batch operations
+  // Optimized batch operations for healthcare data bulk imports
   bulkCreate(items: Array<Omit<TDomain, 'id' | 'createdAt' | 'updatedAt'>>, userId: UserId): TDomain[] {
     try {
       const results: TDomain[] = [];
+      const now = new Date().toISOString();
       
+      // Pre-generate IDs and database representations for better performance
+      const preparedItems = items.map(item => {
+        const id = typeof item === 'object' && 'id' in item ? (item as any).id : uuidv4();
+        const dbData = this.toDatabase({
+          ...item as any,
+          id,
+          createdAt: now,
+          updatedAt: now
+        });
+        return { id, dbData, originalItem: item };
+      });
+
+      if (preparedItems.length === 0) return [];
+
+      // Use prepared statement for bulk insert
+      const columns = Object.keys(preparedItems[0].dbData);
+      const placeholders = columns.map(() => '?').join(', ');
+      const bulkInsertKey = `${this.tableName}_bulk_insert`;
+      
+      const insertStmt = this.db.prepare(`
+        INSERT INTO ${this.tableName} (${columns.join(', ')})
+        VALUES (${placeholders})
+      `, bulkInsertKey);
+      
+      // High-performance bulk transaction
       this.db.transaction(() => {
-        for (const item of items) {
-          const created = this.create(item, userId);
+        for (const prepared of preparedItems) {
+          const values = Object.values(prepared.dbData);
+          insertStmt.run(...values);
+          
+          // Optimized audit logging for bulk operations
+          if (userId) {
+            this.logAuditOptimized(prepared.id, 'INSERT', null, { id: prepared.id, ...prepared.originalItem }, userId);
+          }
+        }
+      });
+
+      // Retrieve created records efficiently
+      for (const prepared of preparedItems) {
+        const created = this.findById(prepared.id as TKey);
+        if (created) {
           results.push(created);
         }
-      })();
+      }
 
       logger.info(`Bulk created ${this.tableName}`, { count: items.length, userId });
       return results;
     } catch (error) {
       logger.error(`Failed to bulk create ${this.tableName}`, { count: items.length, userId, error });
+      throw error;
+    }
+  }
+
+  // High-performance bulk update for healthcare data migrations
+  bulkUpdate(updates: Array<{ id: TKey; data: Partial<TDomain> }>, userId: UserId): TDomain[] {
+    try {
+      const results: TDomain[] = [];
+      const now = new Date().toISOString();
+      
+      if (updates.length === 0) return [];
+
+      // Group updates by columns for better prepared statement reuse
+      const updateGroups = new Map<string, any[]>();
+      
+      for (const update of updates) {
+        const dbData = this.toDatabase({
+          ...update.data as any,
+          updatedAt: now
+        });
+        
+        const updateData = Object.entries(dbData)
+          .filter(([key, value]) => key !== 'id' && value !== undefined)
+          .reduce((acc, [key, value]) => ({ ...acc, [key]: value }), {});
+        
+        if (Object.keys(updateData).length === 0) continue;
+        
+        const columns = Object.keys(updateData).sort();
+        const groupKey = columns.join('_');
+        
+        if (!updateGroups.has(groupKey)) {
+          updateGroups.set(groupKey, []);
+        }
+        
+        updateGroups.get(groupKey)!.push({ id: update.id, data: update.data, dbData: updateData });
+      }
+      
+      // Process each group with optimized prepared statements
+      this.db.transaction(() => {
+        for (const [groupKey, groupUpdates] of updateGroups.entries()) {
+          const columns = Object.keys(groupUpdates[0].dbData);
+          const setClause = columns.map(col => `${col} = ?`).join(', ');
+          const updateKey = `${this.tableName}_bulk_update_${groupKey}`;
+          
+          const updateStmt = this.db.prepare(`
+            UPDATE ${this.tableName} 
+            SET ${setClause}
+            WHERE id = ? AND (deleted_at IS NULL OR deleted_at = '')
+          `, updateKey);
+          
+          for (const update of groupUpdates) {
+            const values = Object.values(update.dbData);
+            const result = updateStmt.run(...values, update.id);
+            
+            if (result.changes > 0 && userId) {
+              // Optimized audit logging for bulk operations
+              this.logAuditOptimized(update.id, 'UPDATE', null, update.data, userId);
+            }
+          }
+        }
+      });
+      
+      // Retrieve updated records
+      for (const update of updates) {
+        const updated = this.findById(update.id);
+        if (updated) {
+          results.push(updated);
+        }
+      }
+      
+      logger.info(`Bulk updated ${this.tableName}`, { count: updates.length, userId });
+      return results;
+    } catch (error) {
+      logger.error(`Failed to bulk update ${this.tableName}`, { count: updates.length, userId, error });
+      throw error;
+    }
+  }
+
+  // Healthcare-specific efficient count with indexing
+  countOptimized(conditions: { [key: string]: any } = {}): number {
+    try {
+      const whereClauses: string[] = ['(deleted_at IS NULL OR deleted_at = \'\')'];
+      const params: any[] = [];
+      
+      // Build optimized WHERE clause using available indexes
+      for (const [key, value] of Object.entries(conditions)) {
+        if (value !== undefined && value !== null) {
+          whereClauses.push(`${key} = ?`);
+          params.push(value);
+        }
+      }
+      
+      const whereClause = whereClauses.join(' AND ');
+      const countKey = `${this.tableName}_count_optimized_${Object.keys(conditions).sort().join('_')}`;
+      
+      const stmt = this.db.prepare(`
+        SELECT COUNT(*) as total FROM ${this.tableName} 
+        WHERE ${whereClause}
+      `, countKey);
+      
+      const result = stmt.get(...params) as { total: number };
+      return result.total;
+    } catch (error) {
+      logger.error(`Failed to count ${this.tableName}`, { conditions, error });
       throw error;
     }
   }

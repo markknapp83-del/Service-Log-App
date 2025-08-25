@@ -145,9 +145,9 @@ export type Result<T, E = Error> =
 // Service log domain types
 export type ServiceLogId = string;
 export type PatientEntryId = string;
-export type ClientId = number;
-export type ActivityId = number;
-export type OutcomeId = number;
+export type ClientId = string; // Changed to string for frontend consistency
+export type ActivityId = string; // Changed to string for frontend consistency
+export type OutcomeId = string; // Changed to string for frontend consistency
 
 // Healthcare domain interfaces
 export interface Client {

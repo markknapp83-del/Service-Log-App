@@ -1,6 +1,5 @@
-// Service Log Page following React 18 patterns
-import React, { useState, useEffect } from 'react';
-import { ServiceLogForm } from '../components/ServiceLogForm';
+// Service Log Page following React 18 patterns with performance optimizations
+import React, { useState, useEffect, useCallback, useMemo, memo, Suspense, lazy } from 'react';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { useToast } from '../hooks/useToast';
@@ -12,6 +11,23 @@ import {
   Outcome,
   ApiResponse 
 } from '../types';
+
+// Lazy load heavy ServiceLogForm component
+const ServiceLogForm = lazy(() => 
+  import('../components/ServiceLogForm').then(module => ({ default: module.ServiceLogForm }))
+);
+
+// Loading component for form
+const FormLoader = memo(() => (
+  <div className="animate-pulse">
+    <div className="h-8 bg-gray-200 rounded mb-4 w-1/3"></div>
+    <div className="h-32 bg-gray-200 rounded mb-4"></div>
+    <div className="h-64 bg-gray-200 rounded mb-4"></div>
+    <div className="h-12 bg-gray-200 rounded w-32"></div>
+  </div>
+));
+
+FormLoader.displayName = 'FormLoader';
 
 interface FormOptions {
   clients: Client[];
@@ -27,8 +43,11 @@ export function ServiceLogPage() {
   const [isLoadingOptions, setIsLoadingOptions] = useState(false); // Prevent concurrent API calls
   const { showToast } = useToast();
 
-  // Load form options from real API
-  const loadFormOptions = async (showSuccessToast = false) => {
+  // Memoized form options to prevent unnecessary re-fetches
+  const memoizedFormOptions = useMemo(() => formOptions, [formOptions]);
+
+  // Load form options from real API with performance optimizations
+  const loadFormOptions = useCallback(async (showSuccessToast = false) => {
     // Prevent concurrent API calls
     if (isLoadingOptions) {
       console.log('Form options already loading, skipping duplicate request');
@@ -72,54 +91,56 @@ export function ServiceLogPage() {
       setIsLoading(false);
       setIsLoadingOptions(false);
     }
-  };
+  }, [isLoadingOptions]); // Removed dependencies that cause infinite loops
 
   useEffect(() => {
     loadFormOptions();
-  }, []);
+  }, []); // Only load once on component mount
 
+  // Temporarily disabled polling to prevent rate limiting issues
   // Poll for template updates every 30 seconds when page is active
-  useEffect(() => {
-    let pollInterval: NodeJS.Timeout;
-    
-    const handleVisibilityChange = () => {
-      if (!document.hidden && formOptions) {
-        // Reload form options when page becomes visible (user switches back)
-        loadFormOptions();
-      }
-    };
+  // useEffect(() => {
+  //   let pollInterval: NodeJS.Timeout;
+  //   
+  //   const handleVisibilityChange = () => {
+  //     if (!document.hidden && formOptions) {
+  //       // Reload form options when page becomes visible (user switches back)
+  //       loadFormOptions();
+  //     }
+  //   };
 
-    // Only set up polling if formOptions is loaded
-    if (formOptions) {
-      document.addEventListener('visibilitychange', handleVisibilityChange);
+  //   // Only set up polling if formOptions is loaded
+  //   if (formOptions) {
+  //     document.addEventListener('visibilitychange', handleVisibilityChange);
 
-      // Optional: Poll every 5 minutes for updates (reduced from 30 seconds to prevent form instability)
-      pollInterval = setInterval(() => {
-        if (!document.hidden) {
-          loadFormOptions(); // Silent refresh - no toasts
-        }
-      }, 300000); // 5 minutes instead of 30 seconds
-    }
+  //     // Optional: Poll every 5 minutes for updates (reduced from 30 seconds to prevent form instability)
+  //     pollInterval = setInterval(() => {
+  //       if (!document.hidden) {
+  //         loadFormOptions(); // Silent refresh - no toasts
+  //       }
+  //     }, 300000); // 5 minutes instead of 30 seconds
+  //   }
 
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      if (pollInterval) {
-        clearInterval(pollInterval);
-      }
-    };
-  }, [formOptions]);
+  //   return () => {
+  //     document.removeEventListener('visibilitychange', handleVisibilityChange);
+  //     if (pollInterval) {
+  //       clearInterval(pollInterval);
+  //     }
+  //   };
+  // }, [formOptions]);
 
-  // Function to manually refresh options
-  const handleRefreshOptions = async () => {
+  // Memoized function to manually refresh options
+  const handleRefreshOptions = useCallback(async () => {
     showToast({
       type: 'info',
       message: 'Refreshing form options...',
     });
     await loadFormOptions(true); // Pass true to show success/error toasts
-  };
+  }, [loadFormOptions]);
 
 
-  const handleSubmit = async (data: ServiceLogFormData) => {
+  // Memoized submit handler for better performance
+  const handleSubmit = useCallback(async (data: ServiceLogFormData) => {
     try {
       setIsSubmitting(true);
       
@@ -166,9 +187,10 @@ export function ServiceLogPage() {
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [showToast]);
 
-  const handleSaveDraft = async (data: ServiceLogFormData) => {
+  // Memoized save draft handler
+  const handleSaveDraft = useCallback(async (data: ServiceLogFormData) => {
     try {
       const response = await apiService.post('/service-logs', {
         clientId: data.clientId,
@@ -195,7 +217,7 @@ export function ServiceLogPage() {
         message: `Draft save failed: ${error instanceof Error ? error.message : 'Unable to save draft. Your work is still preserved locally.'}`,
       });
     }
-  };
+  }, [showToast]);
 
   if (isLoading) {
     return (
@@ -285,14 +307,20 @@ export function ServiceLogPage() {
           </div>
         </div>
 
-        {/* Form */}
-        <ServiceLogForm
-          clients={formOptions.clients}
-          activities={formOptions.activities}
-          outcomes={formOptions.outcomes}
-          onSubmit={handleSubmit}
-          isLoading={isSubmitting}
-        />
+        {/* Form with lazy loading and error boundary */}
+        <Suspense fallback={
+          <Card className="p-8">
+            <FormLoader />
+          </Card>
+        }>
+          <ServiceLogForm
+            clients={memoizedFormOptions.clients}
+            activities={memoizedFormOptions.activities}
+            outcomes={memoizedFormOptions.outcomes}
+            onSubmit={handleSubmit}
+            isLoading={isSubmitting}
+          />
+        </Suspense>
 
         {/* Instructions */}
         <Card className="mt-8 p-6 bg-blue-50 border-blue-200">

@@ -1,0 +1,9 @@
+# Healthcare Service Log Portal - Kubernetes Namespace
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: healthcare-portal
+  labels:
+    name: healthcare-portal
+    app: healthcare-portal
+    compliance: hipaa

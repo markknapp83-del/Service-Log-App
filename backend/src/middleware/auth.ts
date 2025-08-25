@@ -98,3 +98,7 @@ export const optionalAuth = async (req: Request, res: Response, next: NextFuncti
     next();
   }
 };
+
+// Convenience aliases
+export const authenticateToken = authMiddleware;
+export const adminOnly = requireRole(['admin']);

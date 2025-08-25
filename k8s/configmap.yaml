@@ -1,0 +1,26 @@
+# Healthcare Service Log Portal - Kubernetes ConfigMap
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: healthcare-portal-config
+  namespace: healthcare-portal
+data:
+  NODE_ENV: "production"
+  PORT: "3001"
+  LOG_LEVEL: "info"
+  ENABLE_METRICS: "true"
+  RATE_LIMIT_MAX: "100"
+  RATE_LIMIT_WINDOW: "900000"
+  BCRYPT_ROUNDS: "12"
+  SESSION_TIMEOUT: "3600"
+  DB_CACHE_SIZE: "128000"
+  DB_BUSY_TIMEOUT: "60000"
+  DB_MMAP_SIZE: "268435456"
+  BACKUP_RETENTION_DAYS: "2555"
+  ENABLE_AUDIT_LOGGING: "true"
+  ENABLE_PHI_LOGGING: "false"
+  ENABLE_DATA_MASKING: "true"
+  MAX_FILE_SIZE: "10485760"
+  MAX_REQUEST_SIZE: "10mb"
+  HEALTH_CHECK_TIMEOUT: "10000"
+  HEALTH_CHECK_INTERVAL: "30000"

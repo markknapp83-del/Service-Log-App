@@ -1,0 +1,112 @@
+# Healthcare Service Log Portal - Kubernetes Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: healthcare-portal
+  namespace: healthcare-portal
+  labels:
+    app: healthcare-portal
+    version: v1.0.0
+spec:
+  replicas: 2
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  selector:
+    matchLabels:
+      app: healthcare-portal
+  template:
+    metadata:
+      labels:
+        app: healthcare-portal
+        version: v1.0.0
+    spec:
+      serviceAccountName: healthcare-portal
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      containers:
+      - name: healthcare-portal
+        image: healthcare-portal:latest
+        ports:
+        - containerPort: 3001
+          name: http
+        - containerPort: 9091
+          name: metrics
+        env:
+        - name: JWT_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: healthcare-portal-secrets
+              key: jwt-secret
+        - name: JWT_REFRESH_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: healthcare-portal-secrets
+              key: jwt-refresh-secret
+        - name: DB_ENCRYPTION_KEY
+          valueFrom:
+            secretKeyRef:
+              name: healthcare-portal-secrets
+              key: db-encryption-key
+        envFrom:
+        - configMapRef:
+            name: healthcare-portal-config
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "2Gi"
+            cpu: "1"
+        livenessProbe:
+          httpGet:
+            path: /api/health/basic
+            port: 3001
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /api/health/basic
+            port: 3001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        volumeMounts:
+        - name: database-storage
+          mountPath: /app/database
+        - name: logs-storage
+          mountPath: /app/logs
+        - name: uploads-storage
+          mountPath: /app/uploads
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: false
+          capabilities:
+            drop:
+            - ALL
+      volumes:
+      - name: database-storage
+        persistentVolumeClaim:
+          claimName: healthcare-portal-db-pvc
+      - name: logs-storage
+        persistentVolumeClaim:
+          claimName: healthcare-portal-logs-pvc
+      - name: uploads-storage
+        persistentVolumeClaim:
+          claimName: healthcare-portal-uploads-pvc
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchLabels:
+                  app: healthcare-portal
+              topologyKey: kubernetes.io/hostname

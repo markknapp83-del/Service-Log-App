@@ -1,6 +1,5 @@
-// Submissions Page following React 18 documentation patterns
-import React, { useState, useEffect, useCallback, useMemo, memo, Suspense } from 'react';
-import { SubmissionsTable, SubmissionTableRow, SubmissionFilters } from '../components/SubmissionsTable';
+// Submissions Page following React 18 documentation patterns with performance optimizations
+import React, { useState, useEffect, useCallback, useMemo, memo, Suspense, lazy, startTransition } from 'react';
 import { Card } from '../components/Card';
 import { Button } from '../components/Button';
 import { Modal } from '../components/Modal';
@@ -8,11 +7,73 @@ import { useAuth } from '../hooks/useAuth';
 import { useToast } from '../hooks/useToast';
 import { ServiceLog, Client, Activity, User } from '../types';
 
-// API service for submissions
+// Lazy load heavy components
+const SubmissionsTable = lazy(() => 
+  import('../components/SubmissionsTable').then(module => ({ 
+    default: module.SubmissionsTable,
+    SubmissionTableRow: module.SubmissionTableRow,
+    SubmissionFilters: module.SubmissionFilters 
+  }))
+);
+
+type SubmissionTableRow = {
+  id: string;
+  userId: string;
+  userName: string;
+  clientName: string;
+  activityName: string;
+  serviceDate: string;
+  totalPatients: number;
+  newPatients: number;
+  followupPatients: number;
+  dnaPatients: number;
+  isDraft: boolean;
+  submittedAt?: string;
+  createdAt: string;
+};
+
+type SubmissionFilters = {
+  dateFrom?: string;
+  dateTo?: string;
+  clientId?: string;
+  activityId?: string;
+  userId?: string;
+  isDraft?: boolean;
+  searchTerm?: string;
+};
+
+// Loading component for table
+const TableLoader = memo(() => (
+  <Card className="p-8">
+    <div className="animate-pulse space-y-4">
+      <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+      <div className="space-y-3">
+        <div className="h-4 bg-gray-200 rounded"></div>
+        <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+        <div className="h-4 bg-gray-200 rounded w-4/6"></div>
+      </div>
+    </div>
+  </Card>
+));
+
+TableLoader.displayName = 'TableLoader';
+
+// Optimized API service for submissions with caching
 class SubmissionsService {
+  private cache = new Map<string, { data: any; timestamp: number; }>();
+  private readonly CACHE_TTL = 30000; // 30 seconds cache
   private baseURL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:3001/api';
 
   private async fetchWithAuth(endpoint: string, options: RequestInit = {}) {
+    // Check cache first for GET requests
+    const cacheKey = `${endpoint}_${JSON.stringify(options)}`;
+    if (!options.method || options.method === 'GET') {
+      const cached = this.cache.get(cacheKey);
+      if (cached && Date.now() - cached.timestamp < this.CACHE_TTL) {
+        return cached.data;
+      }
+    }
+
     const token = localStorage.getItem('healthcare_portal_token');
     const response = await fetch(`${this.baseURL}${endpoint}`, {
       ...options,
@@ -27,7 +88,18 @@ class SubmissionsService {
       throw new Error(`HTTP error! status: ${response.status}`);
     }
 
-    return response.json();
+    const data = await response.json();
+    
+    // Cache GET responses
+    if (!options.method || options.method === 'GET') {
+      this.cache.set(cacheKey, { data, timestamp: Date.now() });
+    }
+
+    return data;
+  }
+
+  clearCache() {
+    this.cache.clear();
   }
 
   async getSubmissions(filters: SubmissionFilters = {}) {
@@ -93,7 +165,7 @@ const mockUserNames: Record<string, string> = {
   'user-4': 'Therapist Alex Kim',
 };
 
-export function SubmissionsPage() {
+export const SubmissionsPage = memo(() => {
   const { user } = useAuth();
   const { showToast } = useToast();
   const [submissions, setSubmissions] = useState<SubmissionTableRow[]>([]);
@@ -206,16 +278,23 @@ export function SubmissionsPage() {
     loadInitialData();
   }, [user?.role, showToast]);
 
-  // Load submissions based on filters
+  // Load submissions based on filters with performance optimizations
   const loadSubmissions = useCallback(async (appliedFilters: SubmissionFilters = filters) => {
     try {
-      setLoading(true);
+      // Use startTransition for non-urgent updates
+      startTransition(() => {
+        setLoading(true);
+      });
+      
       const response = await submissionsService.getSubmissions(appliedFilters);
       
       if (response.success) {
         const serviceLogs = response.data.serviceLogs || [];
         const transformedSubmissions = transformSubmissionData(serviceLogs);
-        setSubmissions(transformedSubmissions);
+        
+        startTransition(() => {
+          setSubmissions(transformedSubmissions);
+        });
       } else {
         throw new Error('Failed to load submissions');
       }
@@ -224,14 +303,18 @@ export function SubmissionsPage() {
       showToast('Failed to load submissions', 'error');
       setSubmissions([]);
     } finally {
-      setLoading(false);
+      startTransition(() => {
+        setLoading(false);
+      });
     }
   }, [filters, transformSubmissionData, showToast]);
 
-  // Handle filter changes
+  // Handle filter changes with debouncing
   const handleFilterChange = useCallback((newFilters: SubmissionFilters) => {
-    setFilters(newFilters);
-    loadSubmissions(newFilters);
+    startTransition(() => {
+      setFilters(newFilters);
+      loadSubmissions(newFilters);
+    });
   }, [loadSubmissions]);
 
   // Handle viewing submission details
@@ -330,14 +413,16 @@ export function SubmissionsPage() {
           </p>
         </div>
 
-        {/* Submissions Table */}
-        <SubmissionsTable
-          submissions={submissions}
-          loading={loading}
-          onViewDetails={handleViewDetails}
-          onExport={handleExport}
-          onFilterChange={handleFilterChange}
-        />
+        {/* Submissions Table with lazy loading */}
+        <Suspense fallback={<TableLoader />}>
+          <SubmissionsTable
+            submissions={submissions}
+            loading={loading}
+            onViewDetails={handleViewDetails}
+            onExport={handleExport}
+            onFilterChange={handleFilterChange}
+          />
+        </Suspense>
 
         {/* Submission Details Modal */}
         {selectedSubmission && (
@@ -489,4 +574,6 @@ export function SubmissionsPage() {
       </div>
     </div>
   );
-}
+});
+
+SubmissionsPage.displayName = 'SubmissionsPage';

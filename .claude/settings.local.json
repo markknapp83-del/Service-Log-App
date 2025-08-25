@@ -44,7 +44,13 @@
       "Bash(del healthcare.db)",
       "Bash(powershell:*)",
       "Bash(npx tsx:*)",
-      "Bash(sqlite3:*)"
+      "Bash(sqlite3:*)",
+      "Bash(cat:*)",
+      "Bash(sed:*)",
+      "Bash(pkill:*)",
+      "Bash(taskkill:*)",
+      "Bash(chmod:*)",
+      "WebFetch(domain:localhost)"
     ],
     "deny": [],
     "ask": [],

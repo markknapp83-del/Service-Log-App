@@ -24,7 +24,7 @@ export function EntityModal({ isOpen, onClose, onSuccess, entityType, entity }: 
   const { toast } = useToast();
 
   const isEditing = !!entity;
-  const entityTypeSingular = entityType.slice(0, -1);
+  const entityTypeSingular = entityType ? entityType.slice(0, -1) : '';
   const title = isEditing 
     ? `Edit ${entityTypeSingular.charAt(0).toUpperCase() + entityTypeSingular.slice(1)}`
     : `Add New ${entityTypeSingular.charAt(0).toUpperCase() + entityTypeSingular.slice(1)}`;
@@ -36,6 +36,15 @@ export function EntityModal({ isOpen, onClose, onSuccess, entityType, entity }: 
       toast({
         title: 'Validation Error',
         description: 'Name is required.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    if (!entityType) {
+      toast({
+        title: 'Error',
+        description: 'Entity type is required.',
         variant: 'destructive'
       });
       return;
@@ -94,6 +103,11 @@ export function EntityModal({ isOpen, onClose, onSuccess, entityType, entity }: 
     setIsActive(entity?.is_active ?? true);
     onClose();
   };
+
+  // Don't render if entityType is null
+  if (!entityType && isOpen) {
+    return null;
+  }
 
   return (
     <Modal

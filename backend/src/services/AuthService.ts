@@ -9,6 +9,8 @@ import {
   ApiResponse
 } from '@/types/index';
 import { AuthenticationError, ValidationError } from '@/utils/errors';
+import { accountLockoutUtils } from '@/middleware/security';
+import { HIPAALogger } from '@/utils/hipaa-compliance';
 import bcrypt from 'bcryptjs';
 
 // Result type that matches test expectations
@@ -28,30 +30,68 @@ export class AuthService {
     this.jwtUtils = new JWTUtils();
   }
 
-  async login(loginData: LoginRequest): Promise<ServiceResult<LoginResponse>> {
+  async login(loginData: LoginRequest, ipAddress?: string, userAgent?: string): Promise<ServiceResult<LoginResponse>> {
+    const loginIdentifier = loginData.email; // Use email as identifier for lockout
+    
     try {
       // Validate input
       this.validateLoginData(loginData);
 
+      // Check if account is locked
+      if (accountLockoutUtils.isLocked(loginIdentifier)) {
+        const lockoutTime = accountLockoutUtils.getLockoutTime(loginIdentifier);
+        HIPAALogger.warn('Login attempt on locked account', { 
+          email: loginData.email,
+          lockoutTimeRemaining: lockoutTime,
+          ipAddress,
+          userAgent
+        });
+        return { success: false, error: 'Account temporarily locked due to multiple failed attempts' };
+      }
+
       // Find user by email (synchronous)
       const user = this.userRepository.findByEmail(loginData.email);
       if (!user) {
-        logger.warn('Login attempt with invalid email', { email: loginData.email });
+        // Record failed attempt for non-existent user
+        accountLockoutUtils.recordFailedAttempt(loginIdentifier);
+        
+        HIPAALogger.warn('Login attempt with invalid email', { 
+          email: loginData.email,
+          ipAddress,
+          userAgent
+        });
+        
         return { success: false, error: 'Invalid credentials' };
       }
 
       // Check if user is active
       if (!user.isActive) {
-        logger.warn('Login attempt with inactive account', { userId: user.id });
+        HIPAALogger.warn('Login attempt with inactive account', { 
+          userId: user.id,
+          ipAddress,
+          userAgent
+        });
         return { success: false, error: 'Account is inactive' };
       }
 
       // Verify password
       const isPasswordValid = await bcrypt.compare(loginData.password, user.passwordHash);
       if (!isPasswordValid) {
-        logger.warn('Login attempt with invalid password', { userId: user.id });
+        // Record failed login attempt
+        accountLockoutUtils.recordFailedAttempt(loginIdentifier);
+        
+        HIPAALogger.warn('Login attempt with invalid password', { 
+          userId: user.id,
+          ipAddress,
+          userAgent,
+          failedAttempts: accountLockoutUtils.isLocked(loginIdentifier) ? 'Account now locked' : 'Attempt recorded'
+        });
+        
         return { success: false, error: 'Invalid credentials' };
       }
+
+      // Clear any previous failed attempts on successful login
+      accountLockoutUtils.clearAttempts(loginIdentifier);
 
       // Generate tokens
       const accessToken = this.jwtUtils.generateAccessToken({
@@ -67,6 +107,14 @@ export class AuthService {
 
       // Update last login (synchronous)
       this.userRepository.updateLastLogin(user.id);
+      
+      // Log successful login with security context
+      HIPAALogger.info('Successful authentication', { 
+        userId: user.id,
+        ipAddress,
+        userAgent,
+        loginTime: new Date().toISOString()
+      });
 
       // Remove password hash from response
       const userResponse = this.excludePasswordHash(user);
@@ -85,8 +133,17 @@ export class AuthService {
         }
       };
     } catch (error) {
-      logger.error('Error during login', { error, email: loginData.email });
-      return { success: false, error: 'Login failed' };
+      // Record failed attempt on any error
+      accountLockoutUtils.recordFailedAttempt(loginIdentifier);
+      
+      HIPAALogger.error('Login error', { 
+        error: error.message,
+        email: loginData.email,
+        ipAddress,
+        userAgent
+      });
+      
+      return { success: false, error: 'Authentication failed' };
     }
   }
 

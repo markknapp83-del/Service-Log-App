@@ -1281,6 +1281,285 @@ const { fields, isLoading } = useClientCustomFields({ clientId: watchClientId })
 
 ---
 
+## Phase 7.2: Admin Dashboard Entity Management Integration (NEW)
+**📚 PRIMARY DOCUMENTATION**: [React 18](./devdocs/react-18.md) + [shadcn/ui](./devdocs/shadcn-ui.md) + [Express.js](./devdocs/express.js)
+
+### Objectives
+Integrate existing AdminController entity management capabilities directly into the dashboard interface, providing admin users with quick access to add clients, activities, and outcomes without navigating to the full Template Management page. Follow TDD principles and documented patterns.
+
+### 🚨 MANDATORY Pre-Phase Steps
+1. **Review [React 18 Documentation](./devdocs/react-18.md)** - Component composition and dashboard integration patterns
+2. **Study [shadcn/ui Documentation](./devdocs/shadcn-ui.md)** - Modal and form component patterns for dashboard widgets
+3. **Check [Express.js Documentation](./devdocs/express.md)** - API endpoint patterns (already implemented in AdminController)
+4. **Follow documented TDD approach** - Write failing tests first, then implement dashboard features
+5. **Analyze existing EntityModal** - Reuse proven patterns from TemplateManagementPage
+
+### Problem Analysis
+**Current State**: 
+- AdminController already has full CRUD operations for clients, activities, and outcomes (lines 337-693)
+- Backend routes fully implemented with validation (/api/admin/templates/*)
+- EntityModal component exists and works in TemplateManagementPage
+- Dashboard only links to Template Management page, requiring navigation
+
+**Desired State**:
+- Dashboard provides quick "Add" buttons for each entity type
+- Modal popups allow creating new clients, activities, outcomes directly from dashboard
+- Maintains existing Template Management page for full management capabilities
+- No duplicate functionality, reuses existing components and APIs
+
+### Pre-Phase Test Specifications (TDD MANDATORY)
+**📖 Follow dashboard enhancement testing patterns from [React Testing Library Documentation](./devdocs/react-testing-library.md):**
+
+#### Dashboard Component Tests (frontend/tests/DashboardPage.test.tsx)
+**Write FAILING tests first, then implement dashboard enhancements:**
+```typescript
+describe('Dashboard Entity Management - Phase 7.2', () => {
+  describe('Admin Dashboard Quick Actions', () => {
+    test('admin sees "Quick Add" section in dashboard')
+    test('admin sees "Add Client" button in Quick Add section')
+    test('admin sees "Add Activity" button in Quick Add section') 
+    test('admin sees "Add Outcome" button in Quick Add section')
+    test('candidate users do not see Quick Add section')
+    test('Quick Add section displays current entity counts')
+  })
+
+  describe('Quick Add Modal Integration', () => {
+    test('clicking "Add Client" opens EntityModal with client configuration')
+    test('clicking "Add Activity" opens EntityModal with activity configuration')
+    test('clicking "Add Outcome" opens EntityModal with outcome configuration')
+    test('modal success updates dashboard entity counts')
+    test('modal cancel closes without changes')
+    test('modal handles API errors gracefully')
+  })
+
+  describe('Dashboard Performance', () => {
+    test('entity counts load asynchronously without blocking dashboard')
+    test('failed entity count loading does not break dashboard')
+    test('entity counts refresh after successful modal operations')
+  })
+})
+```
+
+#### E2E Tests (e2e-tests/dashboard-entity-management.spec.ts)
+```typescript
+describe('Dashboard Entity Management E2E', () => {
+  test('admin can create client directly from dashboard')
+  test('admin can create activity directly from dashboard') 
+  test('admin can create outcome directly from dashboard')
+  test('new entities appear in service log form dropdowns immediately')
+  test('dashboard entity counts update after creation')
+  test('Template Management page reflects changes made from dashboard')
+})
+```
+
+### UI Components Design
+**🚨 REUSE EXISTING PATTERNS FROM DOCUMENTATION - DO NOT CREATE NEW IMPLEMENTATIONS**
+
+1. **Dashboard Quick Add Section** → [shadcn/ui Documentation](./devdocs/shadcn-ui.md)
+   - Copy documented card component patterns from existing dashboard
+   - Use documented button grid layouts from shadcn/ui examples
+   - Implement documented loading skeleton patterns for entity counts
+   - Follow documented responsive design for admin-only sections
+
+2. **Entity Count Display** → [React 18 Documentation](./devdocs/react-18.md)
+   - Use documented useEffect patterns for async data loading
+   - Copy documented error boundary patterns for API failures
+   - Implement documented loading states with proper accessibility
+   - Follow documented state management for real-time count updates
+
+3. **Modal Integration** → Reuse existing EntityModal component
+   - Import and configure existing EntityModal from TemplateManagementPage
+   - Use existing onSuccess callback patterns for dashboard updates
+   - Apply existing error handling patterns from EntityModal
+   - Maintain existing entity creation API calls (no changes needed)
+
+### Implementation Strategy (TDD APPROACH)
+
+#### Step 1: Dashboard Component Enhancement
+**📖 Follow [React 18 Documentation](./devdocs/react-18.md) dashboard composition patterns:**
+
+**Add to DashboardPage.tsx (after Admin Tools card):**
+```typescript
+// NEW: Quick Add Entity Section (Admin only)
+{user?.role === 'admin' && (
+  <Card>
+    <CardHeader>
+      <CardTitle>Quick Add</CardTitle>
+      <CardDescription>
+        Add new entities without leaving dashboard
+      </CardDescription>
+    </CardHeader>
+    <CardContent>
+      <div className="space-y-3">
+        <div className="grid grid-cols-3 gap-2">
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => handleQuickAdd('clients')}
+            className="text-xs"
+          >
+            Add Client
+            {clientCount && (
+              <span className="ml-1 text-gray-500">({clientCount})</span>
+            )}
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => handleQuickAdd('activities')}
+            className="text-xs"
+          >
+            Add Activity
+            {activityCount && (
+              <span className="ml-1 text-gray-500">({activityCount})</span>
+            )}
+          </Button>
+          <Button 
+            variant="outline" 
+            size="sm"
+            onClick={() => handleQuickAdd('outcomes')}
+            className="text-xs"
+          >
+            Add Outcome
+            {outcomeCount && (
+              <span className="ml-1 text-gray-500">({outcomeCount})</span>
+            )}
+          </Button>
+        </div>
+        <p className="text-xs text-gray-500 text-center">
+          For full management, use <Link to="/admin/templates" className="text-blue-600">Template Management</Link>
+        </p>
+      </div>
+    </CardContent>
+  </Card>
+)}
+```
+
+#### Step 2: Entity Count API Integration
+**📖 Follow [React 18 Documentation](./devdocs/react-18.md) data fetching patterns:**
+
+**Add to DashboardPage.tsx state and effects:**
+```typescript
+// Use existing API endpoints from AdminController
+const [entityCounts, setEntityCounts] = useState({
+  clients: 0,
+  activities: 0, 
+  outcomes: 0
+});
+const [quickAddModalOpen, setQuickAddModalOpen] = useState(false);
+const [quickAddEntityType, setQuickAddEntityType] = useState<'clients' | 'activities' | 'outcomes' | null>(null);
+
+// Load entity counts (reuse existing AdminController endpoints)
+useEffect(() => {
+  if (user?.role === 'admin') {
+    loadEntityCounts();
+  }
+}, [user?.role]);
+
+const loadEntityCounts = async () => {
+  try {
+    const token = localStorage.getItem('healthcare_portal_token');
+    const [clientsRes, activitiesRes, outcomesRes] = await Promise.all([
+      fetch('/api/admin/templates/clients', { headers: { 'Authorization': `Bearer ${token}` }}),
+      fetch('/api/admin/templates/activities', { headers: { 'Authorization': `Bearer ${token}` }}),
+      fetch('/api/admin/templates/outcomes', { headers: { 'Authorization': `Bearer ${token}` }})
+    ]);
+
+    const [clientsData, activitiesData, outcomesData] = await Promise.all([
+      clientsRes.json(), activitiesRes.json(), outcomesRes.json()
+    ]);
+
+    setEntityCounts({
+      clients: clientsData.success ? clientsData.data.length : 0,
+      activities: activitiesData.success ? activitiesData.data.length : 0,
+      outcomes: outcomesData.success ? outcomesData.data.length : 0
+    });
+  } catch (error) {
+    // Silent failure for entity counts - doesn't break dashboard
+    console.warn('Failed to load entity counts:', error);
+  }
+};
+```
+
+#### Step 3: Modal Integration
+**📖 Reuse existing EntityModal patterns from TemplateManagementPage:**
+
+**Add to DashboardPage.tsx imports and modal handling:**
+```typescript
+import { EntityModal } from '@/components/EntityModal';
+
+// Modal handlers (reuse existing patterns)
+const handleQuickAdd = (entityType: 'clients' | 'activities' | 'outcomes') => {
+  setQuickAddEntityType(entityType);
+  setQuickAddModalOpen(true);
+};
+
+const handleQuickAddSuccess = () => {
+  loadEntityCounts(); // Refresh counts after successful creation
+  showToast({
+    type: 'success',
+    message: `New ${quickAddEntityType?.slice(0, -1)} added successfully`,
+  });
+};
+
+// Add before closing JSX:
+<EntityModal
+  isOpen={quickAddModalOpen}
+  onClose={() => setQuickAddModalOpen(false)}
+  onSuccess={handleQuickAddSuccess}
+  entityType={quickAddEntityType as 'clients' | 'activities' | 'outcomes'}
+  entity={null} // Always creating new entities from dashboard
+/>
+```
+
+### Technical Implementation Details
+**🚨 Each implementation MUST follow documented patterns:**
+
+1. **Component Reuse** → Use existing EntityModal without modifications
+2. **API Integration** → Use existing AdminController endpoints (no backend changes)
+3. **State Management** → Follow documented React 18 useEffect and useState patterns
+4. **Error Handling** → Use existing error boundary and toast patterns
+5. **Accessibility** → Follow documented ARIA patterns from shadcn/ui
+6. **Performance** → Use documented async loading patterns to prevent dashboard blocking
+
+### Testing Strategy (TDD Implementation Order)
+**🚨 Each deliverable MUST follow TDD: failing tests first, then implementation:**
+
+1. **Dashboard Enhancement Tests** → Write failing tests for Quick Add section visibility
+2. **Modal Integration Tests** → Write failing tests for EntityModal integration
+3. **API Integration Tests** → Write failing tests for entity count loading
+4. **E2E User Journey Tests** → Write failing tests for complete creation workflow
+5. **Performance Tests** → Write failing tests for async loading behavior
+
+### Success Criteria (Measurable)
+- [ ] **Dashboard Enhancement**: Quick Add section appears for admin users only
+- [ ] **Entity Counts**: Accurate counts display for clients, activities, outcomes  
+- [ ] **Modal Integration**: EntityModal opens with correct configuration for each entity type
+- [ ] **API Integration**: Uses existing AdminController endpoints without modifications
+- [ ] **Success Handling**: Entity counts refresh after successful modal operations
+- [ ] **Error Handling**: Failed API calls don't break dashboard functionality
+- [ ] **Navigation**: Link to full Template Management page remains available
+- [ ] **Performance**: Dashboard loads quickly, entity counts load asynchronously
+- [ ] **Tests**: All TDD tests pass, covering happy path and error scenarios
+
+### File Modifications Required
+**📖 Following documented component enhancement patterns:**
+
+1. **frontend/src/pages/DashboardPage.tsx** → Add Quick Add section and modal integration
+2. **frontend/src/tests/DashboardPage.test.tsx** → Add comprehensive test coverage
+3. **e2e-tests/dashboard-entity-management.spec.ts** → Add E2E test coverage
+
+**No backend changes required** - reuses existing AdminController and routes.
+
+### Dependencies
+**📖 Reusing existing documented patterns:**
+- EntityModal component (already exists)
+- AdminController entity endpoints (already implemented)
+- shadcn/ui Card and Button components (already in use)
+- React Hook Form + Zod validation (already in EntityModal)
+
+---
+
 ## Phase 8: Polish, Optimization & Deployment (Week 8)
 **📚 PRIMARY DOCUMENTATION**: [ALL DOCUMENTATION](./devdocs/index.md) - Comprehensive review and optimization
 

@@ -16,7 +16,7 @@ export class ActivityRepository extends BaseRepository<Activity, DatabaseActivit
   // Convert database row to domain object
   protected fromDatabase(dbRow: DatabaseActivity): Activity {
     return {
-      id: dbRow.id,
+      id: String(dbRow.id), // Convert number to string for frontend consistency
       name: dbRow.name,
       isActive: this.convertBooleanFromDb(dbRow.is_active),
       createdAt: dbRow.created_at,
@@ -28,7 +28,7 @@ export class ActivityRepository extends BaseRepository<Activity, DatabaseActivit
   protected toDatabase(domain: Partial<Activity>): Partial<DatabaseActivity> {
     const result: Partial<DatabaseActivity> = {};
 
-    if (domain.id !== undefined) result.id = domain.id;
+    if (domain.id !== undefined) result.id = Number(domain.id); // Convert string back to number for database
     if (domain.name !== undefined) result.name = domain.name;
     if (domain.isActive !== undefined) result.is_active = this.convertBooleanToDb(domain.isActive);
     if (domain.createdAt !== undefined) result.created_at = domain.createdAt;

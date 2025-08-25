@@ -1,5 +1,5 @@
-// Service Log Form component following documented React Hook Form + Zod patterns
-import React, { useState, useEffect, useRef } from 'react';
+// Service Log Form component following documented React Hook Form + Zod patterns with performance optimizations
+import React, { useState, useEffect, useRef, useCallback, useMemo, memo, startTransition } from 'react';
 import { useForm, useFieldArray } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { Plus, Trash2, Save, RotateCcw } from 'lucide-react';
@@ -28,7 +28,66 @@ interface ServiceLogFormComponentProps extends ServiceLogFormProps {
   outcomes: Outcome[];
 }
 
-export function ServiceLogForm({
+// Memoized patient entry row component
+const PatientEntryRow: React.FC<{
+  index: number;
+  appointmentTypeOptions: SelectOption[];
+  outcomeOptions: SelectOption[];
+  register: any;
+  watch: any;
+  setValue: any;
+  errors: any;
+}> = ({ index, appointmentTypeOptions, outcomeOptions, register, watch, setValue, errors }) => {
+  const appointmentType = watch(`patientEntries.${index}.appointmentType`);
+  const outcomeId = watch(`patientEntries.${index}.outcomeId`);
+  
+  
+  return (
+    <div className="border border-neutral-200 rounded-lg p-4 bg-neutral-50">
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-medium text-neutral-900">
+          Entry {index + 1}
+        </h3>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-2">
+            Appointment Type <span className="text-red-500">*</span>
+          </label>
+          <Select
+            key={`appointment-${index}-${appointmentType}`}
+            options={appointmentTypeOptions}
+            value={appointmentType || ''}
+            onValueChange={(value) => {
+              setValue(`patientEntries.${index}.appointmentType`, value as AppointmentType, { shouldValidate: true });
+            }}
+            placeholder="Select appointment type"
+            error={errors.patientEntries?.[index]?.appointmentType?.message}
+          />
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-neutral-700 mb-2">
+            Outcome <span className="text-red-500">*</span>
+          </label>
+          <Select
+            key={`outcome-${index}-${outcomeId}`}
+            options={outcomeOptions}
+            value={outcomeId || ''}
+            onValueChange={(value) => {
+              setValue(`patientEntries.${index}.outcomeId`, value, { shouldValidate: true });
+            }}
+            placeholder="Select outcome"
+            error={errors.patientEntries?.[index]?.outcomeId?.message}
+          />
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export const ServiceLogForm = memo<ServiceLogFormComponentProps>(({  
   clients,
   activities,
   outcomes,
@@ -36,7 +95,7 @@ export function ServiceLogForm({
   onCancel,
   initialData,
   isLoading = false
-}: ServiceLogFormComponentProps) {
+}: ServiceLogFormComponentProps) => {
   const { showToast } = useToast();
   const { user } = useAuth();
 
@@ -71,48 +130,59 @@ export function ServiceLogForm({
   const watchPatientEntries = watch('patientEntries');
   const watchClientId = watch('clientId');
 
-  // Options for dropdowns
-  const clientOptions: SelectOption[] = clients
-    .filter(client => client.isActive)
-    .map(client => ({
-      value: client.id,
-      label: client.name,
-    }));
+  // Memoized options for dropdowns to prevent recreation on every render
+  const clientOptions: SelectOption[] = useMemo(() => 
+    clients
+      .filter(client => client.isActive)
+      .map(client => ({
+        value: client.id,
+        label: client.name,
+      })),
+    [clients]
+  );
 
-  const activityOptions: SelectOption[] = activities
-    .filter(activity => activity.isActive)
-    .map(activity => ({
-      value: activity.id,
-      label: activity.name,
-    }));
+  const activityOptions: SelectOption[] = useMemo(() => 
+    activities
+      .filter(activity => activity.isActive)
+      .map(activity => ({
+        value: activity.id,
+        label: activity.name,
+      })),
+    [activities]
+  );
 
-  const outcomeOptions: SelectOption[] = outcomes
-    .filter(outcome => outcome.isActive)
-    .map(outcome => ({
-      value: outcome.id,
-      label: outcome.name,
-    }));
+  const outcomeOptions: SelectOption[] = useMemo(() => 
+    outcomes
+      .filter(outcome => outcome.isActive)
+      .map(outcome => ({
+        value: outcome.id,
+        label: outcome.name,
+      })),
+    [outcomes]
+  );
 
-  // Appointment type options
-  const appointmentTypeOptions: SelectOption[] = [
+  // Memoized appointment type options
+  const appointmentTypeOptions: SelectOption[] = useMemo(() => [
     { value: 'new', label: 'New Patient' },
     { value: 'followup', label: 'Follow-up Patient' },
     { value: 'dna', label: 'Did Not Attend (DNA)' },
-  ];
+  ], []);
 
-  // Generate patient rows based on patient count
+  // Generate patient rows based on patient count with performance optimizations
   useEffect(() => {
     const currentEntries = watchPatientEntries || [];
     const desiredCount = watchPatientCount || 0;
     
     if (desiredCount > 0 && currentEntries.length !== desiredCount) {
-      const newEntries: PatientEntry[] = Array.from({ length: desiredCount }, (_, index) => {
-        return currentEntries[index] || {
-          appointmentType: 'new' as AppointmentType,
-          outcomeId: '',
-        };
+      startTransition(() => {
+        const newEntries: PatientEntry[] = Array.from({ length: desiredCount }, (_, index) => {
+          return currentEntries[index] || {
+            appointmentType: 'new' as AppointmentType,
+            outcomeId: '',
+          };
+        });
+        replace(newEntries);
       });
-      replace(newEntries);
     }
   }, [watchPatientCount, replace, watchPatientEntries]);
 
@@ -123,7 +193,8 @@ export function ServiceLogForm({
     localStorage.removeItem('serviceLogDraft');
   }, []);
 
-  const handleFormSubmit = async (data: ServiceLogFormData) => {
+  // Memoized form submit handler
+  const handleFormSubmit = useCallback(async (data: ServiceLogFormData) => {
     try {
       await onSubmit(data);
       showToast({
@@ -136,24 +207,28 @@ export function ServiceLogForm({
         message: `Save failed: ${error instanceof Error ? error.message : 'Please try again.'}`,
       });
     }
-  };
+  }, [onSubmit, showToast]);
 
-  const handleClearForm = () => {
-    reset({
-      clientId: '',
-      activityId: '',
-      serviceDate: '',
-      patientCount: 1,
-      patientEntries: [],
-      additionalNotes: '',
+  // Memoized clear form handler
+  const handleClearForm = useCallback(() => {
+    startTransition(() => {
+      reset({
+        clientId: '',
+        activityId: '',
+        serviceDate: '',
+        patientCount: 1,
+        patientEntries: [],
+        additionalNotes: '',
+      });
     });
     showToast({
       type: 'info',
       message: 'Form cleared: All fields have been reset.',
     });
-  };
+  }, [reset, showToast]);
 
-  const calculateTotals = () => {
+  // Memoized totals calculation for performance
+  const totals = useMemo(() => {
     if (!watchPatientEntries) return { total: 0, new: 0, followup: 0, dna: 0 };
     
     return watchPatientEntries.reduce(
@@ -165,9 +240,7 @@ export function ServiceLogForm({
       }),
       { total: 0, new: 0, followup: 0, dna: 0 }
     );
-  };
-
-  const totals = calculateTotals();
+  }, [watchPatientEntries]);
 
 
   return (
@@ -261,49 +334,16 @@ export function ServiceLogForm({
 
           <div className="space-y-4">
             {fields.map((field, index) => (
-              <div
+              <PatientEntryRow
                 key={field.id}
-                className="border border-neutral-200 rounded-lg p-4 bg-neutral-50"
-              >
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-sm font-medium text-neutral-900">
-                    Entry {index + 1}
-                  </h3>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-2">
-                      Appointment Type <span className="text-red-500">*</span>
-                    </label>
-                    <Select
-                      options={appointmentTypeOptions}
-                      value={watch(`patientEntries.${index}.appointmentType`)}
-                      onValueChange={(value) => 
-                        setValue(`patientEntries.${index}.appointmentType`, value as AppointmentType, { shouldValidate: true })
-                      }
-                      placeholder="Select appointment type"
-                      error={errors.patientEntries?.[index]?.appointmentType?.message}
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-neutral-700 mb-2">
-                      Outcome <span className="text-red-500">*</span>
-                    </label>
-                    <Select
-                      options={outcomeOptions}
-                      value={watch(`patientEntries.${index}.outcomeId`)}
-                      onValueChange={(value) => 
-                        setValue(`patientEntries.${index}.outcomeId`, value, { shouldValidate: true })
-                      }
-                      placeholder="Select outcome"
-                      error={errors.patientEntries?.[index]?.outcomeId?.message}
-                    />
-                  </div>
-                </div>
-
-              </div>
+                index={index}
+                appointmentTypeOptions={appointmentTypeOptions}
+                outcomeOptions={outcomeOptions}
+                register={register}
+                watch={watch}
+                setValue={setValue}
+                errors={errors}
+              />
             ))}
           </div>
 
@@ -401,4 +441,6 @@ export function ServiceLogForm({
 
     </form>
   );
-}
+});
+
+ServiceLogForm.displayName = 'ServiceLogForm';

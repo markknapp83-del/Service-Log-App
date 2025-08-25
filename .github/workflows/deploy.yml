@@ -1,0 +1,382 @@
+# Healthcare Service Log Portal - Production CI/CD Pipeline
+# Automated testing, building, and deployment with security scanning
+
+name: Production Deployment
+
+on:
+  push:
+    branches: [ main, production ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+env:
+  NODE_VERSION: '18'
+  DOCKER_BUILDKIT: 1
+  COMPOSE_DOCKER_CLI_BUILD: 1
+
+jobs:
+  # Security and code quality checks
+  security-scan:
+    name: Security & Quality Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install dependencies
+        run: |
+          cd backend && npm ci
+          cd ../frontend && npm ci
+          
+      - name: Run ESLint
+        run: |
+          cd backend && npm run lint
+          cd ../frontend && npm run lint
+          
+      - name: Run security audit
+        run: |
+          cd backend && npm audit --audit-level moderate
+          cd ../frontend && npm audit --audit-level moderate
+          
+      - name: Scan for secrets
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: CodeQL Analysis
+        uses: github/codeql-action/init@v3
+        with:
+          languages: javascript, typescript
+          
+      - name: Run CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  # Backend tests
+  test-backend:
+    name: Backend Tests
+    runs-on: ubuntu-latest
+    needs: security-scan
+    
+    services:
+      sqlite:
+        image: keinos/sqlite3:latest
+        options: --health-cmd "sqlite3 --version" --health-interval 10s --health-timeout 5s --health-retries 3
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: backend/package-lock.json
+          
+      - name: Install backend dependencies
+        run: cd backend && npm ci
+        
+      - name: Run unit tests
+        run: cd backend && npm run test:unit
+        env:
+          NODE_ENV: test
+          
+      - name: Run integration tests
+        run: cd backend && npm run test:integration
+        env:
+          NODE_ENV: test
+          DB_PATH: ':memory:'
+          
+      - name: Generate coverage report
+        run: cd backend && npm run test:coverage
+        
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          directory: backend/coverage
+          flags: backend
+
+  # Frontend tests
+  test-frontend:
+    name: Frontend Tests
+    runs-on: ubuntu-latest
+    needs: security-scan
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+          
+      - name: Install frontend dependencies
+        run: cd frontend && npm ci
+        
+      - name: Run unit tests
+        run: cd frontend && npm test
+        
+      - name: Run accessibility tests
+        run: cd frontend && npm run test:a11y
+        
+      - name: Generate coverage report
+        run: cd frontend && npm run test:coverage
+        
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          directory: frontend/coverage
+          flags: frontend
+
+  # End-to-end tests
+  test-e2e:
+    name: End-to-End Tests
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          
+      - name: Install Playwright
+        run: npx playwright install --with-deps
+        
+      - name: Start application
+        run: |
+          cd backend && npm ci && npm run build && npm start &
+          cd ../frontend && npm ci && npm run build && npm run preview &
+          sleep 30
+          
+      - name: Run E2E tests
+        run: npx playwright test
+        
+      - name: Upload E2E results
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-results
+          path: playwright-report/
+
+  # Build Docker images
+  build:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [test-backend, test-frontend]
+    outputs:
+      image-tag: ${{ steps.meta.outputs.tags }}
+      image-digest: ${{ steps.build.outputs.digest }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+        
+      - name: Log in to Docker Hub
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+          
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: healthcare-portal
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+            
+      - name: Build and push Docker image
+        id: build
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          push: ${{ github.event_name != 'pull_request' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64,linux/arm64
+          
+      - name: Run Trivy vulnerability scanner
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: ${{ steps.meta.outputs.tags }}
+          format: 'sarif'
+          output: 'trivy-results.sarif'
+          
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: 'trivy-results.sarif'
+
+  # Deploy to staging
+  deploy-staging:
+    name: Deploy to Staging
+    runs-on: ubuntu-latest
+    needs: [test-e2e, build]
+    environment: staging
+    if: github.ref == 'refs/heads/main' || github.event.inputs.environment == 'staging'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Deploy to staging
+        run: |
+          echo "Deploying to staging environment..."
+          # Add staging deployment commands here
+          
+      - name: Run staging health checks
+        run: |
+          echo "Running staging health checks..."
+          curl -f https://staging-healthcare-portal.com/api/health/basic
+          
+      - name: Run staging smoke tests
+        run: |
+          echo "Running staging smoke tests..."
+          # Add staging smoke tests here
+
+  # Deploy to production
+  deploy-production:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    environment: production
+    if: github.ref == 'refs/heads/production' || github.event.inputs.environment == 'production'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup production environment
+        run: |
+          echo "Setting up production environment..."
+          # Configure production secrets and environment
+          
+      - name: Deploy to production
+        run: |
+          echo "Deploying to production environment..."
+          # Add production deployment commands here
+          # This would typically involve:
+          # 1. Connecting to production server
+          # 2. Running deployment script
+          # 3. Database migrations
+          # 4. Health checks
+          
+      - name: Run production health checks
+        run: |
+          echo "Running production health checks..."
+          curl -f https://healthcare-portal.com/api/health/basic
+          curl -f https://healthcare-portal.com/api/health/database
+          curl -f https://healthcare-portal.com/api/health/detailed
+          
+      - name: Send deployment notification
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#deployments'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+        if: always()
+
+  # Performance testing
+  performance-test:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Run Lighthouse CI
+        uses: treosh/lighthouse-ci-action@v10
+        with:
+          urls: |
+            https://staging-healthcare-portal.com
+            https://staging-healthcare-portal.com/login
+            https://staging-healthcare-portal.com/dashboard
+          configPath: ./.lighthouserc.json
+          uploadArtifacts: true
+          temporaryPublicStorage: true
+          
+      - name: Load testing
+        run: |
+          echo "Running load tests..."
+          # Add load testing commands here
+          # Could use tools like Artillery, k6, or JMeter
+
+  # HIPAA compliance verification
+  compliance-check:
+    name: HIPAA Compliance Check
+    runs-on: ubuntu-latest
+    needs: [deploy-staging]
+    if: github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Verify HIPAA compliance
+        run: |
+          echo "Verifying HIPAA compliance..."
+          # Add HIPAA compliance verification steps
+          # This might include:
+          # - Checking encryption at rest and in transit
+          # - Verifying audit logging
+          # - Validating access controls
+          # - Checking data retention policies
+          
+      - name: Generate compliance report
+        run: |
+          echo "Generating HIPAA compliance report..."
+          # Generate compliance report for audit purposes
+
+  # Security monitoring setup
+  monitoring-setup:
+    name: Setup Monitoring
+    runs-on: ubuntu-latest
+    needs: [deploy-production]
+    if: github.ref == 'refs/heads/production'
+    
+    steps:
+      - name: Configure monitoring alerts
+        run: |
+          echo "Configuring production monitoring..."
+          # Set up monitoring and alerting
+          # This might involve:
+          # - Configuring Prometheus alerts
+          # - Setting up log monitoring
+          # - Configuring uptime monitoring
+          # - Setting up security monitoring

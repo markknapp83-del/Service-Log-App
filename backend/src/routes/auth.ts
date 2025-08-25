@@ -31,7 +31,7 @@ router.post('/login',
   asyncHandler(async (req: Request, res: Response) => {
     const { email, password } = req.body;
 
-    const result = await authService.login({ email, password });
+    const result = await authService.login({ email, password }, req.ip, req.get('User-Agent'));
 
     if (!result.success) {
       throw new AuthenticationError(result.error);

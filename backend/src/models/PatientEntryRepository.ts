@@ -23,7 +23,7 @@ export class PatientEntryRepository extends BaseRepository<PatientEntry, Databas
       id: dbRow.id,
       serviceLogId: dbRow.service_log_id,
       appointmentType: dbRow.appointment_type as AppointmentType,
-      outcomeId: dbRow.outcome_id,
+      outcomeId: String(dbRow.outcome_id), // Convert number to string for frontend consistency
       createdAt: dbRow.created_at,
       updatedAt: dbRow.updated_at
     };
@@ -36,7 +36,7 @@ export class PatientEntryRepository extends BaseRepository<PatientEntry, Databas
     if (domain.id !== undefined) result.id = domain.id;
     if (domain.serviceLogId !== undefined) result.service_log_id = domain.serviceLogId;
     if (domain.appointmentType !== undefined) result.appointment_type = domain.appointmentType;
-    if (domain.outcomeId !== undefined) result.outcome_id = domain.outcomeId;
+    if (domain.outcomeId !== undefined) result.outcome_id = Number(domain.outcomeId); // Convert string back to number for database
     if (domain.createdAt !== undefined) result.created_at = domain.createdAt;
     if (domain.updatedAt !== undefined) result.updated_at = domain.updatedAt;
 
